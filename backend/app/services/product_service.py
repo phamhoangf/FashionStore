@@ -140,20 +140,33 @@ class ProductService:
             product.featured = data['featured']
         
         # Xử lý ảnh nếu có
-        if image_file and ProductService.allowed_file(image_file.filename):
-            # Xóa ảnh cũ nếu có
-            if product.image_url:
-                old_image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 
-                                            product.image_url.replace('uploads/', ''))
-                if os.path.exists(old_image_path):
-                    os.remove(old_image_path)
-            
-            # Lưu ảnh mới
-            filename = secure_filename(image_file.filename)
-            unique_filename = f"{uuid.uuid4().hex}_{filename}"
-            image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
-            image_file.save(image_path)
-            product.image_url = f"uploads/{unique_filename}"
+        if image_file and image_file.filename and ProductService.allowed_file(image_file.filename):
+            try:
+                # Đảm bảo thư mục uploads tồn tại
+                os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
+                
+                # Xóa ảnh cũ nếu có
+                if product.image_url:
+                    old_image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 
+                                                product.image_url.replace('uploads/', ''))
+                    if os.path.exists(old_image_path):
+                        os.remove(old_image_path)
+                        current_app.logger.info(f"Deleted old image: {old_image_path}")
+                
+                # Lưu ảnh mới
+                filename = secure_filename(image_file.filename)
+                unique_filename = f"{uuid.uuid4().hex}_{filename}"
+                image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
+                image_file.save(image_path)
+                
+                # Cập nhật URL ảnh
+                product.image_url = f"uploads/{unique_filename}"
+                
+                current_app.logger.info(f"Updated image to {image_path}")
+                current_app.logger.info(f"New image URL: {product.image_url}")
+            except Exception as e:
+                current_app.logger.error(f"Error updating image: {str(e)}")
+                raise Exception(f"Không thể cập nhật ảnh: {str(e)}")
         
         db.session.commit()
         return product

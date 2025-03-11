@@ -144,6 +144,16 @@ def create_product():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@bp.route('/products/<int:id>', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_product(id):
+    try:
+        product = ProductService.get_product_by_id(id)
+        return jsonify(product.to_dict()), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
 @bp.route('/products/<int:id>', methods=['PUT'])
 @jwt_required()
 @admin_required
@@ -250,6 +260,8 @@ def get_all_orders():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('limit', 20, type=int)
     status = request.args.get('status')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
     
     # Base query
     query = Order.query
@@ -258,11 +270,34 @@ def get_all_orders():
     if status:
         query = query.filter_by(status=status)
     
+    # Filter by date range if provided
+    if start_date:
+        try:
+            from datetime import datetime
+            start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            query = query.filter(Order.created_at >= start_datetime)
+        except Exception as e:
+            current_app.logger.error(f"Error parsing start_date: {e}")
+    
+    if end_date:
+        try:
+            from datetime import datetime
+            end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query = query.filter(Order.created_at <= end_datetime)
+        except Exception as e:
+            current_app.logger.error(f"Error parsing end_date: {e}")
+    
     # Paginate
     orders = query.order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page)
     
+    try:
+        order_items = [order.to_dict(include_items=False) for order in orders.items]
+    except Exception as e:
+        current_app.logger.error(f"Error converting orders to dict: {e}")
+        order_items = []
+    
     return jsonify({
-        'items': [order.to_dict() for order in orders.items],
+        'items': order_items,
         'total': orders.total,
         'pages': orders.pages,
         'page': page
@@ -272,8 +307,12 @@ def get_all_orders():
 @jwt_required()
 @admin_required
 def get_order(id):
-    order = OrderService.get_order_by_id(id)
-    return jsonify(order.to_dict()), 200
+    try:
+        order = OrderService.get_order_by_id(id)
+        return jsonify(order.to_dict(include_items=True)), 200
+    except Exception as e:
+        current_app.logger.error(f"Error getting order {id}: {e}")
+        return jsonify({"error": str(e)}), 404
 
 @bp.route('/orders/<int:id>/status', methods=['PUT'])
 @jwt_required()
@@ -339,20 +378,45 @@ def get_dashboard_stats():
         current_app.logger.debug(f"Total users: {total_users}")
         
         # Đơn hàng theo trạng thái
-        pending_orders = Order.query.filter_by(status=OrderStatus.PENDING.value).count()
-        processing_orders = Order.query.filter_by(status=OrderStatus.PROCESSING.value).count()
-        shipped_orders = Order.query.filter_by(status=OrderStatus.SHIPPED.value).count()
-        delivered_orders = Order.query.filter_by(status=OrderStatus.DELIVERED.value).count()
-        cancelled_orders = Order.query.filter_by(status=OrderStatus.CANCELLED.value).count()
+        try:
+            pending_orders = Order.query.filter_by(status="pending").count()
+            processing_orders = Order.query.filter_by(status="processing").count()
+            shipped_orders = Order.query.filter_by(status="shipped").count()
+            delivered_orders = Order.query.filter_by(status="delivered").count()
+            cancelled_orders = Order.query.filter_by(status="cancelled").count()
+        except Exception as e:
+            current_app.logger.error(f"Error getting orders by status: {e}")
+            pending_orders = processing_orders = shipped_orders = delivered_orders = cancelled_orders = 0
         
         # Tổng doanh thu (từ các đơn hàng đã giao)
-        revenue = db.session.query(db.func.sum(Order.total_amount))\
-            .filter(Order.status == OrderStatus.DELIVERED.value)\
-            .scalar() or 0
-        current_app.logger.debug(f"Total revenue: {revenue}")
+        try:
+            revenue = db.session.query(db.func.sum(Order.total_amount))\
+                .filter(Order.status == "delivered")\
+                .scalar() or 0
+            current_app.logger.debug(f"Total revenue: {revenue}")
+        except Exception as e:
+            current_app.logger.error(f"Error calculating revenue: {e}")
+            revenue = 0
         
         # Đơn hàng gần đây (10 đơn hàng mới nhất)
-        recent_orders = Order.query.order_by(Order.created_at.desc()).limit(10).all()
+        try:
+            recent_orders = Order.query.order_by(Order.created_at.desc()).limit(10).all()
+            recent_orders_data = []
+            for order in recent_orders:
+                try:
+                    order_dict = {
+                        'id': order.id,
+                        'user_id': order.user_id,
+                        'status': order.status,
+                        'total_amount': order.total_amount,
+                        'created_at': order.created_at.isoformat() if order.created_at else None
+                    }
+                    recent_orders_data.append(order_dict)
+                except Exception as e:
+                    current_app.logger.error(f"Error converting order to dict: {e}")
+        except Exception as e:
+            current_app.logger.error(f"Error getting recent orders: {e}")
+            recent_orders_data = []
         
         current_app.logger.info(f"Dashboard data successfully retrieved for user {user_id}")
         
@@ -369,7 +433,7 @@ def get_dashboard_stats():
                 'cancelled': cancelled_orders
             },
             'revenue': revenue,
-            'recent_orders': [order.to_dict() for order in recent_orders]
+            'recent_orders': recent_orders_data
         }
         
         current_app.logger.debug(f"Returning dashboard data: {response_data}")

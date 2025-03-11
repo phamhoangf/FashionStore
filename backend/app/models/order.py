@@ -38,8 +38,8 @@ class Order(db.Model):
     # Relationship
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
     
-    def to_dict(self):
-        return {
+    def to_dict(self, include_items=True):
+        order_dict = {
             'id': self.id,
             'user_id': self.user_id,
             'status': self.status,
@@ -51,10 +51,19 @@ class Order(db.Model):
             'payment_status': self.payment_status,
             'transaction_id': self.transaction_id,
             'notes': self.notes,
-            'items': [item.to_dict() for item in self.items],
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+        
+        # Only include items if requested
+        if include_items:
+            try:
+                order_dict['items'] = [item.to_dict() for item in self.items]
+            except Exception as e:
+                order_dict['items'] = []
+                order_dict['items_error'] = str(e)
+                
+        return order_dict
 
 class OrderItem(db.Model):
     __tablename__ = 'order_items'
@@ -67,11 +76,22 @@ class OrderItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
+        product_data = None
+        if self.product:
+            try:
+                product_data = {
+                    'id': self.product.id,
+                    'name': self.product.name,
+                    'image_url': self.product.image_url
+                }
+            except Exception as e:
+                product_data = {'id': self.product_id, 'error': str(e)}
+                
         return {
             'id': self.id,
             'order_id': self.order_id,
             'product_id': self.product_id,
-            'product': self.product.to_dict() if self.product else None,
+            'product': product_data,
             'quantity': self.quantity,
             'price': self.price,
             'total': self.price * self.quantity,

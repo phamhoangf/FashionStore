@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_cors import CORS
@@ -89,6 +89,11 @@ def create_app(config_class=Config):
     app.register_blueprint(orders.bp)
     app.register_blueprint(payment.bp)
     app.register_blueprint(admin.bp)
+    
+    # Route để phục vụ file tĩnh từ thư mục uploads
+    @app.route('/api/uploads/<path:filename>')
+    def serve_upload(filename):
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
     
     # Tạo bảng database khi khởi chạy
     with app.app_context():
