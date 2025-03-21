@@ -12,6 +12,9 @@ const api = axios.create({
 // Thêm interceptor để tự động gửi token JWT trong header
 api.interceptors.request.use(
   (config) => {
+    // Log request để debug
+    console.log(`API Request: ${config.method.toUpperCase()} ${config.url}`, config.params || {});
+    
     // Nếu là FormData, không đặt Content-Type để axios tự động đặt với boundary
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
@@ -45,74 +48,48 @@ let lastRedirectTime = 0;
 
 api.interceptors.response.use(
   (response) => {
+    // Log response để debug
+    console.log(`API Response: ${response.config.method.toUpperCase()} ${response.config.url}`, response.status);
     return response.data;
   },
   (error) => {
-    console.error('API Error:', error);
-    
-    // Xử lý lỗi khi không có response
-    if (!error.response) {
-      return Promise.reject({ 
-        error: 'Network error',
-        message: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng của bạn.' 
-      });
-    }
-    
-    // Xử lý lỗi 401 Unauthorized
-    if (error.response.status === 401) {
-      // Kiểm tra xem lỗi có phải do token không hợp lệ không
-      const errorData = error.response.data;
-      const errorMessage = errorData?.error || errorData?.message || '';
+    // Xử lý lỗi response
+    if (error.response) {
+      // Lỗi từ server với status code
+      console.error('API Error Response:', error.response.status, error.response.data);
       
-      if (errorMessage.includes('Invalid token') || 
-          errorMessage.includes('Token has expired') || 
-          errorMessage.includes('Missing Authorization header')) {
-        localStorage.removeItem('token');
-        
-        // Chỉ chuyển hướng nếu chưa có chuyển hướng nào đang xảy ra
-        // Và nếu đã qua ít nhất 2 giây kể từ lần chuyển hướng cuối cùng
+      // Xử lý lỗi 401 Unauthorized
+      if (error.response.status === 401) {
+        // Kiểm tra xem đã có chuyển hướng nào đang xảy ra chưa
         const currentTime = Date.now();
-        if (!redirectInProgress && (currentTime - lastRedirectTime > 2000)) {
-          // Chỉ chuyển hướng nếu không phải đang ở trang đăng nhập, đăng ký
-          const currentPath = window.location.pathname;
-          if (!currentPath.includes('/login') && 
-              !currentPath.includes('/register')) {
-            
-            redirectInProgress = true;
-            lastRedirectTime = currentTime;
-            
-            // Nếu đang ở trang admin, chuyển hướng đến trang đăng nhập với redirect
-            if (currentPath.includes('/admin')) {
-              setTimeout(() => {
-                window.location.href = '/admin/login';
-                redirectInProgress = false;
-              }, 500);
-            } else {
-              setTimeout(() => {
-                window.location.href = '/login?redirect=' + currentPath;
-                redirectInProgress = false;
-              }, 500);
-            }
-          }
+        if (!redirectInProgress && currentTime - lastRedirectTime > 2000) {
+          redirectInProgress = true;
+          lastRedirectTime = currentTime;
+          
+          // Xóa token và chuyển hướng đến trang đăng nhập
+          localStorage.removeItem('token');
+          
+          // Thông báo cho người dùng
+          alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+          
+          // Chuyển hướng đến trang đăng nhập
+          window.location.href = '/login';
+          
+          // Reset biến theo dõi sau khi chuyển hướng
+          setTimeout(() => {
+            redirectInProgress = false;
+          }, 2000);
         }
       }
+    } else if (error.request) {
+      // Lỗi không nhận được response
+      console.error('API Request Error (No Response):', error.request);
+    } else {
+      // Lỗi khác
+      console.error('API Error:', error.message);
     }
     
-    // Đảm bảo trả về một object có cấu trúc chuẩn
-    const errorData = error.response?.data;
-    if (typeof errorData === 'string') {
-      return Promise.reject({ error: errorData, message: errorData });
-    } else if (errorData && typeof errorData === 'object') {
-      return Promise.reject({
-        ...errorData,
-        message: errorData.message || errorData.error || 'Đã xảy ra lỗi'
-      });
-    } else {
-      return Promise.reject({ 
-        error: 'API error',
-        message: error.message || 'Đã xảy ra lỗi khi gọi API' 
-      });
-    }
+    return Promise.reject(error);
   }
 );
 

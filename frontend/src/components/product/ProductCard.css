@@ -1,7 +1,6 @@
 .product-card {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  overflow: hidden;
-  position: relative;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.125);
   height: 100%;
 }
 
@@ -12,33 +11,26 @@
 
 .card-img-container {
   position: relative;
-  width: 100%;
-  height: 200px;
+  padding-top: 100%; /* Tỷ lệ 1:1 cho ảnh */
   overflow: hidden;
-  background-color: #f8f9fa;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
 .card-img-top {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: opacity 0.3s ease;
-  background-color: #f8f9fa;
-}
-
-.card-img-top.visible {
-  opacity: 1;
 }
 
 .card-img-top.hidden {
   opacity: 0;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: -1;
+}
+
+.card-img-top.visible {
+  opacity: 1;
 }
 
 .image-placeholder {
@@ -48,14 +40,14 @@
   width: 100%;
   height: 100%;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   background-color: #f8f9fa;
-  z-index: 1;
 }
 
-.card-title {
+.product-card .card-title {
   font-size: 1rem;
+  font-weight: 500;
   margin-bottom: 0.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -65,9 +57,49 @@
   height: 2.5rem;
 }
 
-.card-text {
-  font-weight: bold;
+.product-card .card-text {
+  font-weight: 600;
   color: #dc3545 !important;
+}
+
+/* Hiệu ứng khi hover vào nút */
+.product-card .btn {
+  transition: all 0.2s ease;
+}
+
+.product-card .btn:hover {
+  transform: translateY(-2px);
+}
+
+/* Badge cho sản phẩm mới hoặc giảm giá */
+.product-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+}
+
+.product-badge .badge {
+  font-size: 0.75rem;
+  padding: 0.35em 0.65em;
+  margin-right: 5px;
+}
+
+/* Hiệu ứng khi sản phẩm hết hàng */
+.product-card.out-of-stock .card-img-container:after {
+  content: "Hết hàng";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-weight: bold;
+  font-size: 1.2rem;
 }
 
 /* Responsive adjustments */

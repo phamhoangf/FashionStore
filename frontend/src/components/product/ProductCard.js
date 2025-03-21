@@ -17,16 +17,12 @@ const ProductCard = React.memo(({ product }) => {
   
   // Xác định nguồn ảnh khi component được tạo
   useEffect(() => {
-    console.log('ProductCard - Original image URL:', product.image_url);
-    
     // Kiểm tra xem sản phẩm có ảnh không
     if (!product.image_url || product.image_url.trim() === '') {
-      console.log('ProductCard - No image, using default:', DEFAULT_IMAGE);
       setImageSrc(DEFAULT_IMAGE);
       setImageLoaded(true);
     } else {
       const formattedUrl = formatImageUrl(product.image_url, DEFAULT_IMAGE);
-      console.log('ProductCard - Formatted image URL:', formattedUrl);
       setImageSrc(formattedUrl);
     }
   }, [product.image_url]);

@@ -80,33 +80,41 @@ const MOCK_CATEGORIES = [
 // Component hiển thị ảnh sản phẩm với xử lý tải ảnh
 const ProductImage = React.memo(({ product }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [imageSrc, setImageSrc] = useState('');
   const fallbackImage = 'https://via.placeholder.com/60x60?text=No+Image';
 
   // Xác định nguồn ảnh khi component được tạo
   useEffect(() => {
     if (!product.image_url || product.image_url.trim() === '') {
+      console.log('ProductImage - No image URL, using fallback');
       setImageSrc(fallbackImage);
       setImageLoaded(true);
     } else {
-      setImageSrc(formatImageUrl(product.image_url, fallbackImage));
+      console.log('ProductImage - Original image URL:', product.image_url);
+      const formattedUrl = formatImageUrl(product.image_url, fallbackImage);
+      console.log('ProductImage - Formatted image URL:', formattedUrl);
+      setImageSrc(formattedUrl);
     }
   }, [product.image_url]);
 
   // Xử lý sự kiện khi ảnh tải xong
   const handleImageLoad = useCallback(() => {
+    console.log('ProductImage - Image loaded successfully:', imageSrc);
     setImageLoaded(true);
-  }, []);
+  }, [imageSrc]);
 
   // Xử lý sự kiện khi ảnh lỗi
   const handleImageError = useCallback(() => {
+    console.error('ProductImage - Error loading image:', imageSrc);
+    setImageError(true);
     setImageSrc(fallbackImage);
     setImageLoaded(true);
-  }, []);
+  }, [imageSrc]);
 
   return (
     <div className="product-image-container">
-      {!imageLoaded && (
+      {!imageLoaded && !imageError && (
         <div className="image-placeholder">
           <div className="spinner-border spinner-border-sm" role="status">
             <span className="visually-hidden">Loading...</span>

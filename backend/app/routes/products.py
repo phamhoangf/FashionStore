@@ -6,6 +6,7 @@ from app.models.category import Category
 import os
 from werkzeug.utils import secure_filename
 import uuid
+from sqlalchemy import or_
 
 bp = Blueprint('products', __name__, url_prefix='/api/products')
 
@@ -22,6 +23,9 @@ def get_products():
     featured = request.args.get('featured', type=bool)
     search = request.args.get('search', '')
     sort = request.args.get('sort', 'newest')
+    
+    # Log các tham số tìm kiếm để debug
+    current_app.logger.info(f"Search params: page={page}, per_page={per_page}, category_id={category_id}, featured={featured}, search='{search}', sort={sort}")
     
     # Base query
     query = Product.query
@@ -47,7 +51,16 @@ def get_products():
         query = query.filter_by(featured=featured)
         
     if search:
-        query = query.filter(Product.name.ilike(f'%{search}%'))
+        # Chuẩn hóa chuỗi tìm kiếm
+        search = search.strip().lower()
+        # Tìm kiếm trong cả tên và mô tả sản phẩm
+        query = query.filter(
+            or_(
+                Product.name.ilike(f'%{search}%'),
+                Product.description.ilike(f'%{search}%')
+            )
+        )
+        current_app.logger.info(f"Searching for: '{search}'")
     
     # Apply sorting
     if sort == 'price_asc':
@@ -63,6 +76,9 @@ def get_products():
     
     # Pagination
     products = query.paginate(page=page, per_page=per_page)
+    
+    # Log số lượng kết quả tìm được
+    current_app.logger.info(f"Found {products.total} products matching the criteria")
     
     return jsonify({
         'items': [p.to_dict() for p in products.items],
@@ -102,7 +118,10 @@ def create_product():
             filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
             filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
-            image_url = f"/static/uploads/{filename}"
+            # Sử dụng đường dẫn tương đối cho image_url
+            image_url = f"uploads/{filename}"
+            current_app.logger.info(f"Saved image to: {filepath}")
+            current_app.logger.info(f"Image URL: {image_url}")
     
     # Tạo sản phẩm mới
     product = Product(

@@ -2,7 +2,9 @@ import api from './api';
 
 export const getProducts = async (params = {}) => {
   try {
+    console.log('Fetching products with params:', params);
     const response = await api.get('/products', { params });
+    console.log('Products API response:', response);
     return response;
   } catch (error) {
     console.error('Error fetching products:', error);

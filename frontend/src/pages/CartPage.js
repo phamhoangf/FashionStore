@@ -1,50 +1,75 @@
 import React, { useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Button, Alert, Spinner } from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
+import { AuthContext } from '../context/AuthContext';
 import CartItem from '../components/cart/CartItem';
+import { formatCurrency } from '../utils/formatUtils';
 
 const CartPage = () => {
-  const { cart, loading } = useContext(CartContext);
+  const { cart, totalAmount, loading } = useContext(CartContext);
+  const { isAuthenticated } = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  const handleCheckout = () => {
+    if (!isAuthenticated) {
+      // Nếu chưa đăng nhập, chuyển hướng đến trang đăng nhập với redirect về checkout
+      navigate('/login?redirect=/checkout');
+    } else {
+      // Nếu đã đăng nhập, chuyển hướng đến trang thanh toán
+      navigate('/checkout');
+    }
+  };
 
   if (loading) {
-    return <div className="text-center p-5"><div className="spinner-border"></div></div>;
+    return (
+      <Container className="py-5 text-center">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-3">Đang tải giỏ hàng...</p>
+      </Container>
+    );
   }
 
-  if (cart.items.length === 0) {
+  if (cart.length === 0) {
     return (
-      <div className="container py-5 text-center">
+      <Container className="py-5">
         <h1 className="mb-4">Giỏ hàng</h1>
-        <div className="card p-5">
-          <p>Giỏ hàng của bạn đang trống.</p>
-          <Link to="/products" className="btn btn-primary">Tiếp tục mua sắm</Link>
-        </div>
-      </div>
+        <Card className="p-5 text-center">
+          <Card.Body>
+            <p>Giỏ hàng của bạn đang trống.</p>
+            <Button as={Link} to="/products" variant="primary">
+              Tiếp tục mua sắm
+            </Button>
+          </Card.Body>
+        </Card>
+      </Container>
     );
   }
 
   return (
-    <div className="container py-5">
+    <Container className="py-5">
       <h1 className="mb-4">Giỏ hàng</h1>
       
-      <div className="row">
-        <div className="col-lg-8">
-          <div className="card mb-4">
-            <div className="card-body">
-              {cart.items.map(item => (
+      <Row>
+        <Col lg={8}>
+          <Card className="shadow-sm mb-4">
+            <Card.Body>
+              {cart.map(item => (
                 <CartItem key={item.id} item={item} />
               ))}
-            </div>
-          </div>
-        </div>
+            </Card.Body>
+          </Card>
+        </Col>
         
-        <div className="col-lg-4">
-          <div className="card">
-            <div className="card-body">
-              <h5 className="card-title mb-4">Tổng giỏ hàng</h5>
-              
+        <Col lg={4}>
+          <Card className="shadow-sm">
+            <Card.Header className="bg-white">
+              <h5 className="mb-0">Tổng giỏ hàng</h5>
+            </Card.Header>
+            <Card.Body>
               <div className="d-flex justify-content-between mb-3">
                 <span>Tạm tính:</span>
-                <span>{cart.total.toLocaleString('vi-VN')} VNĐ</span>
+                <span>{formatCurrency(totalAmount)}</span>
               </div>
               
               <div className="d-flex justify-content-between mb-3">
@@ -56,21 +81,31 @@ const CartPage = () => {
               
               <div className="d-flex justify-content-between mb-4">
                 <strong>Tổng cộng:</strong>
-                <strong>{cart.total.toLocaleString('vi-VN')} VNĐ</strong>
+                <strong>{formatCurrency(totalAmount)}</strong>
               </div>
               
-              <Link to="/checkout" className="btn btn-primary w-100">
-                Tiến hành thanh toán
-              </Link>
-              
-              <Link to="/products" className="btn btn-outline-secondary w-100 mt-3">
-                Tiếp tục mua sắm
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+              <div className="d-grid gap-2">
+                <Button 
+                  variant="primary" 
+                  size="lg"
+                  onClick={handleCheckout}
+                >
+                  Tiến hành thanh toán
+                </Button>
+                
+                <Button 
+                  as={Link} 
+                  to="/products" 
+                  variant="outline-secondary"
+                >
+                  Tiếp tục mua sắm
+                </Button>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

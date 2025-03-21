@@ -77,6 +77,20 @@ export const AuthProvider = ({ children }) => {
       console.log('Register response in context:', response);
       if (response && response.user) {
         setUser(response.user);
+      } else {
+        // Nếu không có user trong response, thử đăng nhập với flag skipValidation
+        try {
+          const loginResponse = await loginUser({
+            ...userData,
+            skipValidation: true
+          });
+          if (loginResponse && loginResponse.user) {
+            setUser(loginResponse.user);
+          }
+        } catch (loginError) {
+          console.error('Auto login after register failed:', loginError);
+          // Không ném lỗi ở đây để không làm gián đoạn quá trình đăng ký
+        }
       }
       return response;
     } catch (error) {
@@ -99,6 +113,10 @@ export const AuthProvider = ({ children }) => {
     return user && user.is_admin === true;
   };
 
+  const updateUser = (userData) => {
+    setUser(userData);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -109,6 +127,7 @@ export const AuthProvider = ({ children }) => {
         logout: logoutUser,
         isAuthenticated: !!user,
         isAdmin: isAdmin,
+        setUser: updateUser,
       }}
     >
       {children}

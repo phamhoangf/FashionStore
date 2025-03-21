@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { getCart, addToCart, updateCartItem, removeFromCart } from '../services/cartService';
+import { getCart, addToCart, updateCartItem, removeFromCart, clearCart as clearCartAPI } from '../services/cartService';
 import { getProductById } from '../services/productService';
 import { AuthContext } from './AuthContext';
 
@@ -11,6 +11,14 @@ export const CartProvider = ({ children }) => {
   const [tempCart, setTempCart] = useState(null); // Giỏ hàng tạm thời cho người dùng chưa đăng nhập
   const { isAuthenticated, user } = useContext(AuthContext);
 
+  // Tính tổng tiền giỏ hàng
+  const totalAmount = cart.total || 
+    (cart.items ? cart.items.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0) : 0);
+
+  // Tính tổng số lượng sản phẩm trong giỏ hàng
+  const itemCount = cart.total_items || 
+    (cart.items ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0);
+
   // Khởi tạo giỏ hàng từ localStorage hoặc API
   useEffect(() => {
     const initCart = async () => {
@@ -21,6 +29,20 @@ export const CartProvider = ({ children }) => {
         if (isAuthenticated) {
           try {
             const cartData = await getCart();
+            console.log('Cart data from API:', cartData);
+            
+            // Kiểm tra và xử lý dữ liệu sản phẩm trong giỏ hàng
+            if (cartData && cartData.items) {
+              // Đảm bảo mỗi item có dữ liệu sản phẩm đầy đủ
+              cartData.items.forEach(item => {
+                if (item.product) {
+                  console.log(`Product in cart: ${item.product.id} - ${item.product.name} - Image: ${item.product.image_url}`);
+                } else {
+                  console.error(`Missing product data for cart item: ${item.id}`);
+                }
+              });
+            }
+            
             setCart(cartData);
             
             // Nếu có giỏ hàng tạm thời, đồng bộ với giỏ hàng từ API
@@ -456,15 +478,39 @@ export const CartProvider = ({ children }) => {
     });
   };
 
+  // Hàm xóa toàn bộ giỏ hàng
+  const clearCart = async () => {
+    try {
+      if (isAuthenticated) {
+        // Nếu đã đăng nhập, xóa giỏ hàng qua API
+        await clearCartAPI();
+      }
+      
+      // Xóa giỏ hàng trong state
+      setCart({ items: [], total: 0, total_items: 0 });
+      
+      // Xóa giỏ hàng trong localStorage
+      localStorage.removeItem('cart');
+      localStorage.removeItem('tempCart');
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to clear cart:', error);
+      return false;
+    }
+  };
+
   return (
     <CartContext.Provider
       value={{
-        cart: isAuthenticated ? cart : tempCart || { items: [], total: 0, total_items: 0 },
+        cart: cart.items || [],
+        totalAmount,
+        itemCount,
         loading,
         addItem,
         updateItem,
         removeItem,
-        itemCount: isAuthenticated ? (cart.total_items || 0) : (tempCart?.total_items || 0),
+        clearCart
       }}
     >
       {children}

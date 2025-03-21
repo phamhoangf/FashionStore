@@ -77,17 +77,17 @@ class ProductService:
         """
         # Xử lý ảnh nếu có
         image_url = None
-        if image_file and ProductService.allowed_file(image_file.filename):
-            filename = secure_filename(image_file.filename)
-            # Thêm UUID để tránh trùng tên file
-            unique_filename = f"{uuid.uuid4().hex}_{filename}"
+        if image_file and image_file.filename:
+            from flask import current_app
             
-            # Lưu file
-            image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
-            image_file.save(image_path)
+            # Kiểm tra loại file
+            if not ProductService.allowed_file(image_file.filename):
+                raise Exception(f"Loại file không hợp lệ: {image_file.filename}")
             
-            # URL tương đối để lưu vào database
-            image_url = f"uploads/{unique_filename}"
+            # Lưu file ảnh
+            filename = ProductService.save_image(image_file)
+            if filename:
+                image_url = f"uploads/{filename}"
         
         # Tạo sản phẩm mới
         product = Product(
@@ -112,6 +112,44 @@ class ProductService:
         ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
         return '.' in filename and \
             filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    
+    @staticmethod
+    def save_image(image_file):
+        """
+        Lưu file ảnh vào thư mục uploads
+        
+        Args:
+            image_file (FileStorage): File ảnh cần lưu
+            
+        Returns:
+            str: Tên file đã lưu
+        """
+        from flask import current_app
+        import os
+        from werkzeug.utils import secure_filename
+        import uuid
+        
+        try:
+            # Tạo tên file an toàn
+            filename = secure_filename(image_file.filename)
+            unique_filename = f"{uuid.uuid4().hex}_{filename}"
+            
+            # Đường dẫn đầy đủ đến file
+            upload_folder = current_app.config['UPLOAD_FOLDER']
+            file_path = os.path.join(upload_folder, unique_filename)
+            
+            # Lưu file
+            image_file.save(file_path)
+            
+            # Kiểm tra file đã được lưu thành công
+            if os.path.exists(file_path):
+                return unique_filename
+            else:
+                current_app.logger.error(f"Failed to save image: {file_path}")
+                return None
+        except Exception as e:
+            current_app.logger.error(f"Error saving image: {str(e)}")
+            return None
     
     @staticmethod
     def get_product_by_id(product_id):
@@ -140,36 +178,55 @@ class ProductService:
             product.featured = data['featured']
         
         # Xử lý ảnh nếu có
-        if image_file and image_file.filename and ProductService.allowed_file(image_file.filename):
-            try:
-                # Đảm bảo thư mục uploads tồn tại
-                os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
-                
-                # Xóa ảnh cũ nếu có
-                if product.image_url:
-                    old_image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 
-                                                product.image_url.replace('uploads/', ''))
-                    if os.path.exists(old_image_path):
-                        os.remove(old_image_path)
-                        current_app.logger.info(f"Deleted old image: {old_image_path}")
-                
-                # Lưu ảnh mới
-                filename = secure_filename(image_file.filename)
-                unique_filename = f"{uuid.uuid4().hex}_{filename}"
-                image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
-                image_file.save(image_path)
-                
-                # Cập nhật URL ảnh
-                product.image_url = f"uploads/{unique_filename}"
-                
-                current_app.logger.info(f"Updated image to {image_path}")
-                current_app.logger.info(f"New image URL: {product.image_url}")
-            except Exception as e:
-                current_app.logger.error(f"Error updating image: {str(e)}")
-                raise Exception(f"Không thể cập nhật ảnh: {str(e)}")
+        if image_file and image_file.filename:
+            from flask import current_app
+            
+            # Kiểm tra loại file
+            if not ProductService.allowed_file(image_file.filename):
+                raise Exception(f"Loại file không hợp lệ: {image_file.filename}")
+            
+            # Xóa ảnh cũ nếu có
+            if product.image_url:
+                ProductService.delete_image(product.image_url)
+            
+            # Lưu ảnh mới
+            filename = ProductService.save_image(image_file)
+            if filename:
+                product.image_url = f"uploads/{filename}"
         
         db.session.commit()
         return product
+    
+    @staticmethod
+    def delete_image(image_url):
+        """
+        Xóa file ảnh
+        
+        Args:
+            image_url (str): URL ảnh cần xóa
+        """
+        from flask import current_app
+        import os
+        
+        if not image_url:
+            return
+        
+        try:
+            # Lấy tên file từ URL
+            if image_url.startswith('uploads/'):
+                filename = image_url.replace('uploads/', '')
+            else:
+                filename = os.path.basename(image_url)
+            
+            # Đường dẫn đầy đủ đến file
+            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            
+            # Xóa file nếu tồn tại
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                current_app.logger.info(f"Deleted image: {file_path}")
+        except Exception as e:
+            current_app.logger.error(f"Error deleting image: {str(e)}")
     
     @staticmethod
     def delete_product(product_id):
@@ -178,10 +235,7 @@ class ProductService:
         
         # Xóa ảnh nếu có
         if product.image_url:
-            image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 
-                                    product.image_url.replace('uploads/', ''))
-            if os.path.exists(image_path):
-                os.remove(image_path)
+            ProductService.delete_image(product.image_url)
         
         db.session.delete(product)
         db.session.commit()

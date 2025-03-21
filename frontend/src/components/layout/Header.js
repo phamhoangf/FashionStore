@@ -1,5 +1,5 @@
-import React, { useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useContext, useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { CartContext } from '../../context/CartContext';
 
@@ -7,10 +7,34 @@ const Header = () => {
   const { user, isAuthenticated, logout, isAdmin } = useContext(AuthContext);
   const { itemCount } = useContext(CartContext);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      console.log('Searching for:', searchTerm.trim());
+      
+      // Kiểm tra xem đã ở trang sản phẩm chưa
+      const isProductsPage = location.pathname === '/products';
+      
+      // Nếu đã ở trang sản phẩm, cập nhật URL với tham số tìm kiếm mới
+      // và thêm timestamp để đảm bảo React Router nhận biết sự thay đổi
+      if (isProductsPage) {
+        navigate(`/products?search=${encodeURIComponent(searchTerm.trim())}&timestamp=${Date.now()}`);
+      } else {
+        // Nếu chưa ở trang sản phẩm, chuyển hướng đến trang sản phẩm với tham số tìm kiếm
+        navigate(`/products?search=${encodeURIComponent(searchTerm.trim())}`);
+      }
+      
+      // Xóa trường tìm kiếm sau khi đã tìm
+      setSearchTerm('');
+    }
   };
 
   return (
@@ -29,7 +53,24 @@ const Header = () => {
               <Link className="nav-link" to="/products">Sản phẩm</Link>
             </li>
           </ul>
-          <ul className="navbar-nav">
+          
+          <form className="d-flex mx-auto" onSubmit={handleSearch}>
+            <div className="input-group">
+              <input 
+                type="search" 
+                className="form-control" 
+                placeholder="Tìm kiếm sản phẩm..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                aria-label="Search"
+              />
+              <button className="btn btn-outline-primary" type="submit">
+                <i className="bi bi-search"></i>
+              </button>
+            </div>
+          </form>
+          
+          <ul className="navbar-nav ms-auto">
             <li className="nav-item">
               <Link className="nav-link position-relative" to="/cart">
                 Giỏ hàng

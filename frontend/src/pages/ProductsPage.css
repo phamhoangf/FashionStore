@@ -1,0 +1,117 @@
+/* Styling cho trang sản phẩm */
+.filter-card {
+  position: sticky;
+  top: 20px;
+}
+
+.search-highlight {
+  background-color: rgba(255, 255, 0, 0.3);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 5px;
+  margin-bottom: 5px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+}
+
+.filter-badge .close-btn {
+  margin-left: 5px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.filter-badge .close-btn:hover {
+  opacity: 1;
+}
+
+.pagination .page-link {
+  color: #0d6efd;
+  background-color: #fff;
+  border-color: #dee2e6;
+}
+
+.pagination .page-item.active .page-link {
+  color: #fff;
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.pagination .page-item.disabled .page-link {
+  color: #6c757d;
+  pointer-events: none;
+  background-color: #fff;
+  border-color: #dee2e6;
+}
+
+.search-result-count {
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin-bottom: 1rem;
+}
+
+/* Responsive styles */
+@media (max-width: 767.98px) {
+  .filter-card {
+    position: static;
+    margin-bottom: 1.5rem;
+  }
+  
+  .product-grid {
+    margin-top: 1.5rem;
+  }
+}
+
+/* Animation for search results */
+@keyframes highlightFade {
+  from { background-color: rgba(255, 255, 0, 0.5); }
+  to { background-color: rgba(255, 255, 0, 0); }
+}
+
+.search-result-item {
+  animation: highlightFade 2s ease-out;
+}
+
+/* Styling for empty state */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  background-color: #f8f9fa;
+  border-radius: 0.5rem;
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  color: #6c757d;
+  margin-bottom: 1rem;
+}
+
+.empty-state-text {
+  font-size: 1.2rem;
+  color: #343a40;
+  margin-bottom: 1.5rem;
+}
+
+/* Styling for filter section */
+.filter-section {
+  margin-bottom: 1.5rem;
+}
+
+.filter-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #212529;
+}
+
+.filter-divider {
+  margin: 1rem 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+} 

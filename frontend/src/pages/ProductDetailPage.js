@@ -20,12 +20,16 @@ const ProductDetailPage = () => {
   const { isAuthenticated } = useContext(AuthContext);
   const navigate = useNavigate();
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [imageSrc, setImageSrc] = useState('');
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
+        setImageLoaded(false);
+        setImageError(false);
+        
         const data = await getProductById(id);
         setProduct(data);
         if (data.sizes && data.sizes.length > 0) {
@@ -37,7 +41,8 @@ const ProductDetailPage = () => {
           setImageSrc(DEFAULT_IMAGE);
           setImageLoaded(true);
         } else {
-          setImageSrc(formatImageUrl(data.image_url, DEFAULT_IMAGE));
+          const formattedUrl = formatImageUrl(data.image_url, DEFAULT_IMAGE);
+          setImageSrc(formattedUrl);
         }
       } catch (error) {
         console.error('Error fetching product:', error);
@@ -91,6 +96,7 @@ const ProductDetailPage = () => {
   const handleImageError = useCallback(() => {
     setImageSrc(DEFAULT_IMAGE);
     setImageLoaded(true);
+    setImageError(true);
   }, []);
 
   if (loading) {
@@ -142,6 +148,11 @@ const ProductDetailPage = () => {
               alt={product.name}
               onLoad={handleImageLoad}
               onError={handleImageError}
+              style={{ 
+                maxWidth: '100%',
+                maxHeight: '100%',
+                objectFit: 'contain'
+              }}
             />
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { formatImageUrl } from '../../utils/imageUtils';
 
 const ProductForm = () => {
   const { id } = useParams();
@@ -15,7 +16,8 @@ const ProductForm = () => {
     stock: '',
     category_id: '',
     featured: false,
-    image: null
+    image: null,
+    originalImageUrl: ''
   });
   
   const [preview, setPreview] = useState('');
@@ -45,7 +47,6 @@ const ProductForm = () => {
   const fetchProductDetails = async () => {
     try {
       setLoading(true);
-      console.log('Fetching product details for ID:', id);
       const product = await api.get(`/admin/products/${id}`);
       console.log('Product details received:', product);
       
@@ -57,16 +58,22 @@ const ProductForm = () => {
         stock: product.stock || '',
         category_id: product.category_id || '',
         featured: product.featured || false,
-        image: null
+        image: null,
+        originalImageUrl: product.image_url
       });
       
       // Nếu sản phẩm có ảnh, hiển thị preview
       if (product.image_url) {
-        // Đảm bảo URL đầy đủ
-        const imageUrl = product.image_url.startsWith('http') 
-          ? product.image_url 
-          : `http://localhost:5000/api/${product.image_url}`;
-        console.log('Setting preview image URL:', imageUrl);
+        console.log('Original image URL:', product.image_url);
+        
+        // Hiển thị thông tin debug
+        console.log('Product image details:');
+        console.log('- Image URL:', product.image_url);
+        console.log('- API URL:', process.env.REACT_APP_API_URL || 'http://localhost:5000');
+        
+        // Sử dụng hàm formatImageUrl để đảm bảo URL đầy đủ
+        const imageUrl = formatImageUrl(product.image_url);
+        console.log('Formatted image URL:', imageUrl);
         setPreview(imageUrl);
       }
       
@@ -85,17 +92,39 @@ const ProductForm = () => {
       setFormData({ ...formData, [name]: checked });
     } else if (type === 'file') {
       const file = e.target.files[0];
-      setFormData({ ...formData, image: file });
       
-      // Tạo preview cho ảnh
       if (file) {
+        // Kiểm tra loại file
+        const fileType = file.type;
+        if (!fileType.match(/^image\/(jpeg|jpg|png|gif)$/)) {
+          setError('Chỉ chấp nhận file ảnh (JPEG, PNG, GIF)');
+          return;
+        }
+        
+        // Kiểm tra kích thước file (giới hạn 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          setError('Kích thước file không được vượt quá 5MB');
+          return;
+        }
+        
+        setFormData({ ...formData, image: file });
+        setError(''); // Xóa thông báo lỗi nếu có
+        
+        // Tạo preview cho ảnh
         const reader = new FileReader();
         reader.onloadend = () => {
           setPreview(reader.result);
         };
+        reader.onerror = () => {
+          setError('Không thể đọc file ảnh');
+        };
         reader.readAsDataURL(file);
       } else {
-        setPreview('');
+        // Nếu không chọn file, giữ nguyên preview hiện tại nếu đang ở chế độ chỉnh sửa
+        if (!isEditMode) {
+          setPreview('');
+        }
+        setFormData({ ...formData, image: null });
       }
     } else {
       setFormData({ ...formData, [name]: value });
@@ -113,35 +142,49 @@ const ProductForm = () => {
       
       // Thêm các trường dữ liệu vào FormData
       Object.keys(formData).forEach(key => {
-        if (key === 'image' && formData[key]) {
-          data.append('image', formData[key]);
-        } else if (key !== 'image') {
+        if (key === 'image') {
+          if (formData[key]) {
+            console.log('Adding image to FormData:', formData[key].name);
+            data.append('image', formData[key]);
+          }
+        } else if (key !== 'originalImageUrl') { // Không gửi originalImageUrl
           data.append(key, formData[key]);
         }
       });
       
-      console.log('Submitting form data:', Object.fromEntries(data.entries()));
+      // Log FormData để debug
+      console.log('FormData entries:');
+      for (let pair of data.entries()) {
+        console.log(pair[0] + ': ' + (pair[0] === 'image' ? 'File object' : pair[1]));
+      }
       
       let response;
       
       if (isEditMode) {
+        console.log(`Sending PUT request to /admin/products/${id}`);
         response = await api.put(`/admin/products/${id}`, data, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
         });
+        
+        console.log('Product updated successfully:', response);
+        setSuccess('Sản phẩm đã được cập nhật thành công!');
+        
+        // Cập nhật lại thông tin sản phẩm sau khi cập nhật thành công
+        fetchProductDetails();
       } else {
+        console.log('Sending POST request to /admin/products');
         response = await api.post('/admin/products', data, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
         });
-      }
-      
-      setSuccess(isEditMode ? 'Sản phẩm đã được cập nhật thành công!' : 'Sản phẩm đã được tạo thành công!');
-      
-      // Nếu là tạo mới, reset form
-      if (!isEditMode) {
+        
+        console.log('Product created successfully:', response);
+        setSuccess('Sản phẩm đã được tạo thành công!');
+        
+        // Nếu là tạo mới, reset form
         setFormData({
           name: '',
           description: '',
@@ -150,7 +193,8 @@ const ProductForm = () => {
           stock: '',
           category_id: '',
           featured: false,
-          image: null
+          image: null,
+          originalImageUrl: ''
         });
         setPreview('');
       }
@@ -158,7 +202,19 @@ const ProductForm = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error submitting product:', error);
-      setError(error.message || 'Có lỗi xảy ra khi lưu sản phẩm');
+      
+      // Log chi tiết lỗi
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+        setError(error.response.data.error || 'Có lỗi xảy ra khi lưu sản phẩm');
+      } else if (error.request) {
+        console.error('Error request:', error.request);
+        setError('Không thể kết nối đến máy chủ');
+      } else {
+        console.error('Error message:', error.message);
+        setError(error.message || 'Có lỗi xảy ra khi lưu sản phẩm');
+      }
+      
       setLoading(false);
     }
   };
@@ -312,16 +368,40 @@ const ProductForm = () => {
                 {preview && (
                   <div className="mt-3 text-center">
                     <p>Xem trước:</p>
-                    <img
-                      src={preview}
-                      alt="Preview"
-                      className="img-thumbnail"
-                      style={{ maxHeight: '200px' }}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://via.placeholder.com/150';
+                    <div 
+                      style={{ 
+                        width: '100%', 
+                        height: '200px', 
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        backgroundColor: '#f8f9fa',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '0.25rem'
                       }}
-                    />
+                    >
+                      <img
+                        src={preview}
+                        alt="Preview"
+                        style={{ 
+                          maxHeight: '100%', 
+                          maxWidth: '100%',
+                          objectFit: 'contain'
+                        }}
+                        onError={(e) => {
+                          console.error('Error loading image preview:', preview);
+                          e.target.onerror = null;
+                          e.target.src = 'https://via.placeholder.com/150';
+                        }}
+                      />
+                    </div>
+                    <div className="mt-2 text-muted small">
+                      {preview.startsWith('data:') 
+                        ? 'Ảnh mới đã chọn' 
+                        : 'Ảnh hiện tại của sản phẩm'}
+                    </div>
                   </div>
                 )}
               </div>

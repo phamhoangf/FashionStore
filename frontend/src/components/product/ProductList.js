@@ -1,45 +1,39 @@
 import React from 'react';
-import { Row, Col, Container } from 'react-bootstrap';
+import { Row, Col, Spinner } from 'react-bootstrap';
 import ProductCard from './ProductCard';
 
 const ProductList = ({ products, loading, error }) => {
   if (loading) {
     return (
-      <Container>
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p className="mt-3">Loading products...</p>
-        </div>
-      </Container>
+      <div className="text-center py-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-3">Đang tải sản phẩm...</p>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Container>
-        <div className="alert alert-danger my-4" role="alert">
-          Error: {error}
-        </div>
-      </Container>
+      <div className="alert alert-danger my-4" role="alert">
+        <i className="bi bi-exclamation-triangle-fill me-2"></i>
+        Lỗi: {error}
+      </div>
     );
   }
 
   if (!products || products.length === 0) {
     return (
-      <Container>
-        <div className="text-center py-5">
-          <p>No products found.</p>
-        </div>
-      </Container>
+      <div className="text-center py-5">
+        <i className="bi bi-search fs-1 text-muted mb-3 d-block"></i>
+        <p className="text-muted">Không tìm thấy sản phẩm nào.</p>
+      </div>
     );
   }
 
   return (
-    <Row className="g-4">
+    <Row className="g-4 product-grid">
       {products.map((product) => (
-        <Col key={product.id} xs={12} sm={6} md={4} lg={3}>
+        <Col key={product.id} xs={12} sm={6} md={6} lg={4} xl={4}>
           <ProductCard product={product} />
         </Col>
       ))}

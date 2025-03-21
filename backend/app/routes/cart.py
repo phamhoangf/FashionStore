@@ -26,10 +26,24 @@ def get_cart():
         
         # Lấy các sản phẩm trong giỏ hàng
         cart_items = CartItem.query.filter_by(user_id=user_id, cart_id=cart.id).all()
+        
+        # Đảm bảo mỗi item có dữ liệu sản phẩm đầy đủ
+        items_data = []
+        for item in cart_items:
+            item_dict = item.to_dict()
+            # Kiểm tra xem sản phẩm có tồn tại không
+            if item.product:
+                # Log thông tin sản phẩm để debug
+                current_app.logger.info(f"Product in cart: {item.product.id} - {item.product.name} - Image: {item.product.image_url}")
+            else:
+                current_app.logger.error(f"Missing product data for cart item: {item.id}")
+            
+            items_data.append(item_dict)
+        
         total = sum(item.product.price * item.quantity for item in cart_items if item.product)
         
         return jsonify({
-            'items': [item.to_dict() for item in cart_items],
+            'items': items_data,
             'total': total,
             'total_items': sum(item.quantity for item in cart_items)
         }), 200

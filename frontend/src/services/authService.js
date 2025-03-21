@@ -2,6 +2,18 @@ import api from './api';
 
 export const login = async (credentials) => {
   try {
+    // Kiểm tra credentials
+    if (!credentials) {
+      throw new Error('Thông tin đăng nhập không hợp lệ');
+    }
+    
+    // Chỉ kiểm tra email và password khi đăng nhập trực tiếp, không phải sau khi đăng ký
+    if (!credentials.skipValidation) {
+      if (!credentials.email || !credentials.password) {
+        throw new Error('Email và mật khẩu là bắt buộc');
+      }
+    }
+    
     // Xóa token cũ nếu có
     localStorage.removeItem('token');
     
@@ -75,6 +87,13 @@ export const register = async (userData) => {
       
       // Lấy thông tin người dùng sau khi đăng ký
       const userInfo = await checkAuthStatus();
+      
+      // Khi gọi login sau khi đăng ký, đánh dấu để bỏ qua kiểm tra email và password
+      const loginResponse = await login({ 
+        ...userData, 
+        skipValidation: true  // Thêm flag để bỏ qua validation
+      });
+      
       return {
         ...response,
         user: userInfo
@@ -93,12 +112,18 @@ export const logout = async () => {
   try {
     // Xóa token trước khi gọi API logout
     localStorage.removeItem('token');
+    
+    // Xóa thông tin admin
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('adminUser');
+    
+    // Gọi API logout
     const response = await api.post('/auth/logout');
     console.log('Logout response:', response);
     return response;
   } catch (error) {
     console.error('Logout error:', error);
-    // Không ném lỗi khi logout thất bại, vẫn xóa token
+    // Không ném lỗi khi logout thất bại, vẫn xóa token và thông tin admin
     return { success: true, message: 'Đã đăng xuất' };
   }
 };
