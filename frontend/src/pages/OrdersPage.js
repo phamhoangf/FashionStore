@@ -21,12 +21,23 @@ const OrdersPage = () => {
         setLoading(true);
         const response = await getUserOrders();
         
-        if (response) {
+        console.log('Orders response:', response);
+        
+        // Check if response is structured with items property
+        if (response && response.items) {
+          setOrders(response.items);
+        } else if (Array.isArray(response)) {
+          // If response is directly an array
           setOrders(response);
+        } else {
+          // If response is not as expected, set empty array
+          console.error('Unexpected response format:', response);
+          setOrders([]);
         }
       } catch (error) {
         console.error('Error fetching orders:', error);
         setError('Không thể tải danh sách đơn hàng. Vui lòng thử lại sau.');
+        setOrders([]); // Ensure orders is always an array
       } finally {
         setLoading(false);
       }
@@ -120,7 +131,7 @@ const OrdersPage = () => {
       
       {error && <Alert variant="danger">{error}</Alert>}
       
-      {orders.length === 0 ? (
+      {!Array.isArray(orders) || orders.length === 0 ? (
         <Alert variant="info">
           Bạn chưa có đơn hàng nào. <Link to="/products">Mua sắm ngay</Link>
         </Alert>
@@ -140,7 +151,7 @@ const OrdersPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map(order => (
+                  {Array.isArray(orders) && orders.map(order => (
                     <tr key={order.id}>
                       <td>#{order.id}</td>
                       <td>{formatDate(order.created_at)}</td>

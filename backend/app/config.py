@@ -30,6 +30,8 @@ class Config:
     # VNPAY Configuration
     VNPAY_TMN_CODE = os.environ.get('VNPAY_TMN_CODE') or 'your-tmn-code'
     VNPAY_HASH_SECRET_KEY = os.environ.get('VNPAY_HASH_SECRET_KEY') or 'your-hash-secret'
-    VNPAY_PAYMENT_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'
+    VNPAY_PAYMENT_URL = os.environ.get('VNPAY_PAYMENT_URL') or 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'
     VNPAY_RETURN_URL = os.environ.get('VNPAY_RETURN_URL') or 'http://localhost:5000/api/payment/vnpay-return'
     VNPAY_API_URL = 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction'
+    # Frontend URL for redirection
+    FRONTEND_URL = os.environ.get('FRONTEND_URL') or 'http://localhost:3000'

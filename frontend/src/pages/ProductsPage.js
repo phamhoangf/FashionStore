@@ -16,6 +16,8 @@ const ProductsPage = () => {
   
   const [filters, setFilters] = useState({
     category: searchParams.get('category') || '',
+    parentCategory: searchParams.get('parentCategory') || '',
+    subcategory: searchParams.get('subcategory') || '',
     search: searchParams.get('search') || '',
     sort: searchParams.get('sort') || 'newest',
     page: parseInt(searchParams.get('page')) || 1
@@ -25,22 +27,59 @@ const ProductsPage = () => {
 
   // Theo dõi thay đổi trong URL để cập nhật bộ lọc
   useEffect(() => {
+    // Reset tất cả bộ lọc khi có tham số từ URL mới
     const newFilters = {
       category: searchParams.get('category') || '',
+      parentCategory: searchParams.get('parentCategory') || '',
+      subcategory: searchParams.get('subcategory') || '',
       search: searchParams.get('search') || '',
       sort: searchParams.get('sort') || 'newest',
       page: parseInt(searchParams.get('page')) || 1
     };
     
+    // Debug log - kiểm tra những tham số được truyền qua URL
+    console.log('URL Search Params:', Object.fromEntries([...searchParams]));
+    console.log('New filters from URL:', newFilters);
+    
+    // Kiểm tra xem URL có timestamp không (từ click trên header)
+    const hasTimestamp = searchParams.get('timestamp');
+    
+    // So sánh timestamp hiện tại với timestamp trước đó
+    const currentTimestamp = hasTimestamp ? parseInt(hasTimestamp) : 0;
+    const prevTimestamp = filters.timestamp ? parseInt(filters.timestamp) : 0;
+    
+    // Nếu URL có timestamp mới hoặc không có timestamp trước đó
+    if (currentTimestamp > prevTimestamp) {
+      // Reset toàn bộ bộ lọc và chỉ áp dụng các bộ lọc từ URL mới
+      console.log('New navigation detected, resetting all filters');
+      
+      // Cập nhật timestamp vào state filters để theo dõi
+      setFilters({
+        ...newFilters,
+        timestamp: hasTimestamp
+      });
+      
+      setSearchInput(newFilters.search);
+      return;
+    }
+    
     // Cập nhật bộ lọc nếu có thay đổi
     if (
       newFilters.category !== filters.category ||
+      newFilters.parentCategory !== filters.parentCategory ||
+      newFilters.subcategory !== filters.subcategory ||
       newFilters.search !== filters.search ||
       newFilters.sort !== filters.sort ||
       newFilters.page !== filters.page
     ) {
       console.log('URL params changed, updating filters:', newFilters);
-      setFilters(newFilters);
+      
+      // Giữ lại timestamp cũ
+      setFilters(prev => ({
+        ...newFilters,
+        timestamp: prev.timestamp
+      }));
+      
       setSearchInput(newFilters.search);
     }
   }, [searchParams, location.search]); // Thêm location.search để bắt cả timestamp
@@ -49,8 +88,8 @@ const ProductsPage = () => {
     setLoading(true);
     setError(null);
     try {
-      // Loại bỏ timestamp khỏi tham số gửi đến API
-      const { timestamp, ...apiParams } = filters;
+      // Loại bỏ timestamp và các tham số không cần thiết khỏi tham số gửi đến API
+      const { timestamp, parentCategory, subcategory, ...apiParams } = filters;
       
       // Đảm bảo tham số search không bị undefined hoặc null
       const params = {
@@ -59,6 +98,8 @@ const ProductsPage = () => {
         limit: 12
       };
       
+      // Luôn sử dụng category ID để filter (có thể là parent hoặc subcategory)
+      // category sẽ luôn có giá trị hợp lệ từ việc thay đổi bộ lọc
       console.log('Fetching products with params:', params);
       const data = await getProducts(params);
       
@@ -86,14 +127,44 @@ const ProductsPage = () => {
     const fetchCategories = async () => {
       try {
         const data = await getCategories();
-        setCategories(data);
+        console.log('Categories data from API:', data);
+        
+        // Tạo danh sách đầy đủ các danh mục
+        const allCategories = data;
+        
+        // Lọc danh mục gốc (không có parent_id)
+        const rootCategories = data.filter(cat => !cat.parent_id);
+        
+        // Gán subcategories cho mỗi danh mục gốc
+        rootCategories.forEach(rootCat => {
+          rootCat.subcategories = data.filter(cat => cat.parent_id === rootCat.id);
+        });
+        
+        console.log('Organized categories with subcategories:', rootCategories);
+        
+        // Lưu cả danh sách đầy đủ và danh sách phân cấp
+        setCategories(rootCategories);
+        
+        // Tìm parent category nếu đang chọn subcategory
+        if (filters.category && !filters.parentCategory) {
+          // Kiểm tra xem category hiện tại có phải là subcategory không
+          const selectedCategory = allCategories.find(cat => cat.id.toString() === filters.category.toString());
+          if (selectedCategory && selectedCategory.parent_id) {
+            // Nếu là subcategory, cập nhật cả parent category và subcategory
+            setFilters(prev => ({
+              ...prev,
+              parentCategory: selectedCategory.parent_id.toString(),
+              subcategory: selectedCategory.id.toString()
+            }));
+          }
+        }
       } catch (error) {
         console.error('Error fetching categories:', error);
       }
     };
 
     fetchCategories();
-  }, []);
+  }, [filters.category, filters.parentCategory]);
 
   useEffect(() => {
     fetchProducts();
@@ -153,9 +224,12 @@ const ProductsPage = () => {
     setSearchInput('');
     setFilters({
       category: '',
+      parentCategory: '',
+      subcategory: '',
       search: '',
       sort: 'newest',
-      page: 1
+      page: 1,
+      timestamp: Date.now() // Tạo timestamp mới để đánh dấu việc reset
     });
   };
 
@@ -181,6 +255,55 @@ const ProductsPage = () => {
           </div>
           <Button variant="outline-secondary" size="sm" onClick={clearSearch}>
             Xóa tìm kiếm
+          </Button>
+        </Alert>
+      )}
+      
+      {/* Hiển thị filter theo category hoặc subcategory */}
+      {(filters.parentCategory || filters.subcategory) && (
+        <Alert variant="info" className="d-flex justify-content-between align-items-center">
+          <div>
+            {filters.parentCategory && (
+              <span>
+                Danh mục: <strong>
+                  {categories.find(c => c.id.toString() === filters.parentCategory)?.name || 'Danh mục đã chọn'}
+                </strong>
+              </span>
+            )}
+            {filters.subcategory && (
+              <span className="ms-2">
+                | Danh mục con: <strong>
+                  {(() => {
+                    // Tìm parent category
+                    const parentCat = categories.find(c => c.id.toString() === filters.parentCategory);
+                    if (!parentCat) return filters.subcategory;
+                    
+                    // Tìm subcategory trong parent category
+                    const subCat = parentCat.subcategories.find(
+                      sc => sc.id.toString() === filters.subcategory
+                    );
+                    
+                    return subCat ? subCat.name : filters.subcategory;
+                  })()}
+                </strong>
+              </span>
+            )}
+            {total > 0 ? <span className="search-result-count ms-2">({total} sản phẩm)</span> : ''}
+          </div>
+          <Button 
+            variant="outline-secondary" 
+            size="sm" 
+            onClick={() => {
+              setFilters(prev => ({
+                ...prev,
+                category: '',
+                parentCategory: '',
+                subcategory: '',
+                page: 1
+              }));
+            }}
+          >
+            Xóa bộ lọc danh mục
           </Button>
         </Alert>
       )}
@@ -211,10 +334,17 @@ const ProductsPage = () => {
               <div className="filter-divider"></div>
               
               <div className="filter-section">
-                <h5 className="filter-section-title">Danh mục</h5>
+                <h5 className="filter-section-title">Danh mục chính</h5>
                 <Form.Select
-                  value={filters.category}
-                  onChange={(e) => handleFilterChange('category', e.target.value)}
+                  value={filters.parentCategory || ''}
+                  onChange={(e) => {
+                    const parentCatId = e.target.value;
+                    handleFilterChange('parentCategory', parentCatId);
+                    // Reset subcategory khi thay đổi parent category
+                    handleFilterChange('subcategory', '');
+                    // Nếu chọn danh mục chính, category sẽ là parent category
+                    handleFilterChange('category', parentCatId);
+                  }}
                   className="mb-3"
                 >
                   <option value="">Tất cả danh mục</option>
@@ -225,6 +355,32 @@ const ProductsPage = () => {
                   ))}
                 </Form.Select>
               </div>
+              
+              {/* Hiển thị danh mục con nếu đã chọn danh mục chính */}
+              {filters.parentCategory && (
+                <div className="filter-section mt-3">
+                  <h5 className="filter-section-title">Danh mục con</h5>
+                  <Form.Select
+                    value={filters.subcategory || ''}
+                    onChange={(e) => {
+                      const subCatId = e.target.value;
+                      handleFilterChange('subcategory', subCatId);
+                      // Nếu chọn subcategory, category sẽ là subcategory để filter
+                      handleFilterChange('category', subCatId || filters.parentCategory);
+                    }}
+                    className="mb-3"
+                  >
+                    <option value="">Tất cả {categories.find(c => c.id.toString() === filters.parentCategory)?.name || ''}</option>
+                    {categories
+                      .find(cat => cat.id.toString() === filters.parentCategory)
+                      ?.subcategories.map(subcat => (
+                        <option key={subcat.id} value={subcat.id}>
+                          {subcat.name}
+                        </option>
+                      ))}
+                  </Form.Select>
+                </div>
+              )}
               
               <div className="filter-divider"></div>
               
@@ -244,50 +400,92 @@ const ProductsPage = () => {
               </div>
               
               {/* Hiển thị các bộ lọc đang áp dụng */}
-              {(filters.category || filters.search || filters.sort !== 'newest') && (
+              {(filters.category || filters.subcategory || filters.search || filters.sort !== 'newest') && (
                 <>
                   <div className="filter-divider"></div>
                   <div className="filter-section">
                     <h5 className="filter-section-title">Bộ lọc đang áp dụng</h5>
-                    <div className="d-flex flex-wrap">
-                      {filters.category && (
-                        <Badge bg="primary" className="filter-badge">
-                          Danh mục: {categories.find(c => c.id.toString() === filters.category)?.name || filters.category}
-                          <span 
-                            className="close-btn"
-                            onClick={() => handleFilterChange('category', '')}
-                          >
-                            &times;
-                          </span>
+                    <div className="applied-filters">
+                      {filters.parentCategory && (
+                        <Badge 
+                          bg="primary" 
+                          className="filter-badge"
+                          onClick={() => {
+                            handleFilterChange('parentCategory', '');
+                            handleFilterChange('subcategory', '');
+                            handleFilterChange('category', '');
+                          }}
+                        >
+                          Danh mục: {categories.find(c => c.id.toString() === filters.parentCategory)?.name || 'Đã chọn'}
+                          <i className="bi bi-x-circle-fill ms-1"></i>
                         </Badge>
                       )}
+                      
+                      {filters.subcategory && (
+                        <Badge 
+                          bg="info" 
+                          className="filter-badge"
+                          onClick={() => {
+                            handleFilterChange('subcategory', '');
+                            // Đặt category về parent category khi xóa subcategory
+                            handleFilterChange('category', filters.parentCategory);
+                          }}
+                        >
+                          Danh mục con: {(() => {
+                            // Tìm parent category
+                            const parentCat = categories.find(c => c.id.toString() === filters.parentCategory);
+                            if (!parentCat) return filters.subcategory;
+                            
+                            // Tìm subcategory trong parent category
+                            const subCat = parentCat.subcategories.find(
+                              sc => sc.id.toString() === filters.subcategory
+                            );
+                            
+                            return subCat ? subCat.name : filters.subcategory;
+                          })()}
+                          <i className="bi bi-x-circle-fill ms-1"></i>
+                        </Badge>
+                      )}
+                      
+                      {filters.search && (
+                        <Badge 
+                          bg="success" 
+                          className="filter-badge"
+                          onClick={() => clearSearch()}
+                        >
+                          Tìm kiếm: {filters.search}
+                          <i className="bi bi-x-circle-fill ms-1"></i>
+                        </Badge>
+                      )}
+                      
                       {filters.sort !== 'newest' && (
-                        <Badge bg="primary" className="filter-badge">
+                        <Badge 
+                          bg="secondary" 
+                          className="filter-badge"
+                          onClick={() => handleFilterChange('sort', 'newest')}
+                        >
                           Sắp xếp: {
                             filters.sort === 'price_asc' ? 'Giá tăng dần' :
                             filters.sort === 'price_desc' ? 'Giá giảm dần' :
                             filters.sort === 'name_asc' ? 'Tên A-Z' :
-                            filters.sort === 'name_desc' ? 'Tên Z-A' : filters.sort
+                            filters.sort === 'name_desc' ? 'Tên Z-A' : ''
                           }
-                          <span 
-                            className="close-btn"
-                            onClick={() => handleFilterChange('sort', 'newest')}
-                          >
-                            &times;
-                          </span>
+                          <i className="bi bi-x-circle-fill ms-1"></i>
                         </Badge>
                       )}
                     </div>
-                    {(filters.category || filters.search || filters.sort !== 'newest') && (
+                    
+                    <div className="mt-2">
                       <Button 
                         variant="outline-secondary" 
                         size="sm" 
-                        className="mt-2"
                         onClick={clearAllFilters}
+                        className="w-100"
                       >
+                        <i className="bi bi-trash me-1"></i>
                         Xóa tất cả bộ lọc
                       </Button>
-                    )}
+                    </div>
                   </div>
                 </>
               )}

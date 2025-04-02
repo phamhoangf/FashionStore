@@ -57,4 +57,4 @@ logs/
 
 # Database
 *.sqlite3
-*.db 
+*.db backend/.env

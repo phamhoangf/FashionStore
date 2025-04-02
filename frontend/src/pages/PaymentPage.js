@@ -45,16 +45,23 @@ const PaymentPage = () => {
   const handlePayment = async () => {
     try {
       setPaymentLoading(true);
+      setError(''); // Clear any previous errors
+      
+      console.log('Starting payment process for order:', id);
       const paymentResponse = await payWithVNPay(id);
       
       if (paymentResponse && paymentResponse.payment_url) {
-        window.location.href = paymentResponse.payment_url;
+        console.log('Redirecting to payment URL:', paymentResponse.payment_url);
+        // Use timeout to ensure the UI updates before redirecting
+        setTimeout(() => {
+          window.location.href = paymentResponse.payment_url;
+        }, 100);
       } else {
         throw new Error('Không thể tạo URL thanh toán');
       }
     } catch (error) {
       console.error('Payment error:', error);
-      setError(error.message || 'Không thể khởi tạo thanh toán. Vui lòng thử lại sau.');
+      setError(typeof error === 'string' ? error : (error.message || 'Không thể khởi tạo thanh toán. Vui lòng thử lại sau.'));
     } finally {
       setPaymentLoading(false);
     }

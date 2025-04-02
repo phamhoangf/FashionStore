@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Container, Card, Button, Alert, Spinner } from 'react-bootstrap';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getOrderDetails } from '../services/orderService';
 import { formatCurrency } from '../utils/formatUtils';
+import { CartContext } from '../context/CartContext';
 
 const OrderSuccessPage = () => {
   const { id } = useParams();
@@ -11,28 +12,87 @@ const OrderSuccessPage = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { clearCart } = useContext(CartContext);
 
   // Kiểm tra xem có phải từ VNPay chuyển về không
   const isFromVNPay = location.search.includes('vnp_ResponseCode');
   const vnpResponseCode = new URLSearchParams(location.search).get('vnp_ResponseCode');
   const paymentSuccess = vnpResponseCode === '00';
 
+  // Đảm bảo giỏ hàng được xóa khi đến trang này, nhất là khi từ VNPay chuyển về
+  useEffect(() => {
+    const ensureCartCleared = async () => {
+      try {
+        // Đảm bảo giỏ hàng được xóa, đặc biệt khi từ VNPay redirect về
+        await clearCart(true);
+        
+        // Force immediate visual update of the cart badge
+        try {
+          const cartBadges = document.querySelectorAll('.position-absolute.badge');
+          cartBadges.forEach(badge => {
+            if (badge.parentElement?.textContent.includes('Giỏ hàng')) {
+              badge.style.display = 'none';
+            }
+          });
+        } catch (domError) {
+          console.error('DOM update failed:', domError);
+        }
+        
+        console.log('Cart cleared on OrderSuccessPage load');
+      } catch (error) {
+        console.error('Error clearing cart:', error);
+      }
+    };
+
+    ensureCartCleared();
+  }, [clearCart]);
+
   useEffect(() => {
     const fetchOrderDetails = async () => {
-      if (!id) return;
+      if (!id) {
+        setError('Mã đơn hàng không hợp lệ');
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
+        setError(''); // Clear any previous errors
+        
+        console.log(`Attempting to fetch order ${id} details`);
         const orderData = await getOrderDetails(id);
         
         if (orderData) {
+          console.log(`Order ${id} data loaded successfully:`, orderData);
           setOrder(orderData);
         } else {
+          console.error(`Order ${id} data is empty or invalid`);
           setError('Không tìm thấy thông tin đơn hàng');
         }
       } catch (error) {
         console.error('Error fetching order details:', error);
-        setError('Không thể tải thông tin đơn hàng. Vui lòng thử lại sau.');
+        
+        // Handle error message coming as string or object
+        let errorMessage;
+        
+        if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        } else {
+          errorMessage = 'Không thể tải thông tin đơn hàng. Vui lòng thử lại sau.';
+        }
+        
+        // Handle specific error cases
+        if (errorMessage.includes('quyền truy cập')) {
+          errorMessage = 'Bạn không có quyền truy cập đơn hàng này';
+        } else if (errorMessage.includes('không tìm thấy')) {
+          errorMessage = 'Không tìm thấy thông tin đơn hàng với mã này';
+        } else if (errorMessage.includes('role') || errorMessage.includes('attribute')) {
+          errorMessage = 'Lỗi hệ thống khi xác thực quyền truy cập';
+        }
+        
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -104,6 +164,15 @@ const OrderSuccessPage = () => {
               {order.payment_status === 'paid' 
                 ? 'Thanh toán đã được xác nhận thành công!' 
                 : 'Đơn hàng đang chờ xác nhận thanh toán.'}
+            </Alert>
+          </div>
+        )}
+        
+        {order.payment_method === 'cod' && (
+          <div className="mb-4">
+            <Alert variant="info">
+              <strong>Thanh toán khi nhận hàng (COD)</strong>
+              <p className="mb-0 mt-2">Bạn sẽ thanh toán khi nhận được hàng. Vui lòng chuẩn bị số tiền {formatCurrency(order.total_amount)} khi nhận hàng.</p>
             </Alert>
           </div>
         )}

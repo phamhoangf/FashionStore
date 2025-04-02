@@ -39,15 +39,26 @@ def vnpay_return():
 def create_payment(order_id):
     user_id = get_jwt_identity()
     
-    # Kiểm tra quyền truy cập đơn hàng
-    order = Order.query.get_or_404(order_id)
-    if order.user_id != user_id:
-        return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
-    
-    # Tạo URL thanh toán
-    payment_url = PaymentService.create_payment_url(order_id)
-    
-    return jsonify({"payment_url": payment_url}), 200
+    try:
+        # Kiểm tra quyền truy cập đơn hàng
+        order = Order.query.get_or_404(order_id)
+        if order.user_id != user_id:
+            return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
+        
+        # Nếu đơn hàng đã thanh toán
+        if order.payment_status == 'paid':
+            return jsonify({"error": "Đơn hàng này đã được thanh toán"}), 400
+            
+        # Tạo URL thanh toán
+        payment_url = PaymentService.create_payment_url(order_id)
+        
+        if not payment_url:
+            return jsonify({"error": "Không thể tạo URL thanh toán"}), 500
+            
+        return jsonify({"payment_url": payment_url}), 200
+    except Exception as e:
+        current_app.logger.error(f"Error creating payment for order {order_id}: {str(e)}")
+        return jsonify({"error": f"Lỗi khi tạo thanh toán: {str(e)}"}), 500
 
 @bp.route('/check/<int:order_id>', methods=['GET'])
 @jwt_required()

@@ -20,18 +20,23 @@ def get_products():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('limit', 10, type=int)
     category_id = request.args.get('category', type=int)
+    subcategory_id = request.args.get('subcategory_id', type=int)
     featured = request.args.get('featured', type=bool)
     search = request.args.get('search', '')
     sort = request.args.get('sort', 'newest')
     
     # Log các tham số tìm kiếm để debug
-    current_app.logger.info(f"Search params: page={page}, per_page={per_page}, category_id={category_id}, featured={featured}, search='{search}', sort={sort}")
+    current_app.logger.info(f"Search params: page={page}, per_page={per_page}, category_id={category_id}, subcategory_id={subcategory_id}, featured={featured}, search='{search}', sort={sort}")
     
     # Base query
     query = Product.query
     
     # Apply filters
-    if category_id:
+    if subcategory_id:
+        # Nếu có subcategory_id, ưu tiên lọc theo subcategory_id
+        query = query.filter_by(category_id=subcategory_id)
+        current_app.logger.info(f"Filtering by subcategory_id: {subcategory_id}")
+    elif category_id:
         # Lấy danh mục theo ID
         category = Category.query.get(category_id)
         if category:

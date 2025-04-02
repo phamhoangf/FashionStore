@@ -1,0 +1,38 @@
+footer {
+  margin-top: auto;
+}
+
+footer h5 {
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+footer .list-unstyled li {
+  margin-bottom: 0.75rem;
+}
+
+footer a {
+  transition: color 0.3s ease;
+}
+
+footer a:hover {
+  color: #0d6efd !important;
+}
+
+.social-links a {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+.social-links a:hover {
+  transform: translateY(-3px);
+}
+
+.social-links i {
+  font-size: 1.5rem;
+}
+
+footer hr {
+  margin: 2rem 0;
+  opacity: 0.2;
+} 

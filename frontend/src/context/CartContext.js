@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { getCart, addToCart, updateCartItem, removeFromCart, clearCart as clearCartAPI } from '../services/cartService';
 import { getProductById } from '../services/productService';
 import { AuthContext } from './AuthContext';
+import NotificationModal from '../components/common/NotificationModal';
 
 export const CartContext = createContext();
 
@@ -10,6 +11,14 @@ export const CartProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [tempCart, setTempCart] = useState(null); // Giỏ hàng tạm thời cho người dùng chưa đăng nhập
   const { isAuthenticated, user } = useContext(AuthContext);
+  
+  // State for notification modal
+  const [notification, setNotification] = useState({
+    show: false,
+    title: '',
+    message: '',
+    product: null
+  });
 
   // Tính tổng tiền giỏ hàng
   const totalAmount = cart.total || 
@@ -18,6 +27,27 @@ export const CartProvider = ({ children }) => {
   // Tính tổng số lượng sản phẩm trong giỏ hàng
   const itemCount = cart.total_items || 
     (cart.items ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0);
+
+  // Ensure itemCount is a valid number
+  const safeItemCount = isNaN(itemCount) ? 0 : itemCount;
+
+  // Show notification
+  const showNotification = (title, message, product) => {
+    setNotification({
+      show: true,
+      title,
+      message,
+      product
+    });
+  };
+
+  // Hide notification
+  const hideNotification = () => {
+    setNotification(prev => ({
+      ...prev,
+      show: false
+    }));
+  };
 
   // Khởi tạo giỏ hàng từ localStorage hoặc API
   useEffect(() => {
@@ -113,21 +143,60 @@ export const CartProvider = ({ children }) => {
 
   const addItem = async (productId, quantity) => {
     try {
+      let product = null;
+      
+      // Get product details first
+      try {
+        product = await getProductById(productId);
+      } catch (error) {
+        console.error('Failed to get product details:', error);
+      }
+      
       // Nếu đã đăng nhập, thêm vào giỏ hàng qua API
       if (isAuthenticated) {
         try {
           const updatedCart = await addToCart(productId, quantity);
           setCart(updatedCart);
+          
+          // Show notification
+          if (product) {
+            showNotification(
+              'Thêm vào giỏ hàng thành công',
+              `Đã thêm ${quantity} sản phẩm vào giỏ hàng.`,
+              product
+            );
+          }
+          
           return updatedCart;
         } catch (error) {
           console.error('Failed to add item to cart via API:', error);
           // Nếu API lỗi, thêm vào giỏ hàng local
           await addItemToLocalCart(productId, quantity);
+          
+          // Still show notification even if API fails
+          if (product) {
+            showNotification(
+              'Thêm vào giỏ hàng thành công',
+              `Đã thêm ${quantity} sản phẩm vào giỏ hàng.`,
+              product
+            );
+          }
+          
           return cart;
         }
       } else {
         // Nếu chưa đăng nhập, lưu vào giỏ hàng tạm thời
         await addItemToTempCart(productId, quantity);
+        
+        // Show notification
+        if (product) {
+          showNotification(
+            'Thêm vào giỏ hàng thành công',
+            `Đã thêm ${quantity} sản phẩm vào giỏ hàng.`,
+            product
+          );
+        }
+        
         return tempCart;
       }
     } catch (error) {
@@ -479,20 +548,53 @@ export const CartProvider = ({ children }) => {
   };
 
   // Hàm xóa toàn bộ giỏ hàng
-  const clearCart = async () => {
+  const clearCart = async (forceReload = false) => {
     try {
+      console.log('Clearing cart, before clear - itemCount:', itemCount);
+      
       if (isAuthenticated) {
         // Nếu đã đăng nhập, xóa giỏ hàng qua API
         await clearCartAPI();
       }
       
-      // Xóa giỏ hàng trong state
-      setCart({ items: [], total: 0, total_items: 0 });
+      // Xóa giỏ hàng trong state - đảm bảo cập nhật đúng cấu trúc
+      setCart({ 
+        items: [], 
+        total: 0, 
+        total_items: 0 
+      });
+      
+      // Force immediate state update for cart count in header
+      // This is a direct DOM update as a fallback to ensure UI consistency
+      try {
+        const cartBadges = document.querySelectorAll('.position-absolute.badge');
+        cartBadges.forEach(badge => {
+          if (badge.parentElement?.textContent.includes('Giỏ hàng')) {
+            badge.style.display = 'none';
+          }
+        });
+      } catch (domError) {
+        console.error('DOM update failed:', domError);
+      }
+      
+      // Cập nhật giỏ hàng tạm thời nếu có
+      if (tempCart) {
+        setTempCart(null);
+      }
       
       // Xóa giỏ hàng trong localStorage
       localStorage.removeItem('cart');
       localStorage.removeItem('tempCart');
       
+      // Nếu cần tải lại trang để đồng bộ trạng thái
+      if (forceReload) {
+        console.log('Force reload requested for cart clear');
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      }
+      
+      console.log('Cart has been cleared completely, new itemCount should be 0');
       return true;
     } catch (error) {
       console.error('Failed to clear cart:', error);
@@ -505,15 +607,26 @@ export const CartProvider = ({ children }) => {
       value={{
         cart: cart.items || [],
         totalAmount,
-        itemCount,
+        itemCount: safeItemCount,
         loading,
         addItem,
         updateItem,
         removeItem,
-        clearCart
+        clearCart,
+        showNotification,
+        hideNotification
       }}
     >
       {children}
+      
+      {/* Render notification modal */}
+      <NotificationModal
+        show={notification.show}
+        onHide={hideNotification}
+        title={notification.title}
+        message={notification.message}
+        product={notification.product}
+      />
     </CartContext.Provider>
   );
 };

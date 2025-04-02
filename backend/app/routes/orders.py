@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models.order import Order, OrderItem, OrderStatus
@@ -35,16 +35,28 @@ def get_orders():
 def get_order(id):
     user_id = get_jwt_identity()
     
-    # Lấy thông tin đơn hàng
-    order = OrderService.get_order_by_id(id)
-    
-    # Kiểm tra quyền truy cập
-    if order.user_id != user_id:
-        user = User.query.get(user_id)
-        if not user or user.role != 'admin':
-            return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
-    
-    return jsonify(order.to_dict()), 200
+    try:
+        # Lấy thông tin đơn hàng
+        order = OrderService.get_order_by_id(id)
+        
+        # Kiểm tra quyền truy cập
+        if order.user_id != user_id:
+            try:
+                # Sửa lỗi: Không kiểm tra role mà kiểm tra is_admin
+                user = User.query.get(user_id)
+                if not user:
+                    return jsonify({"error": "Không tìm thấy thông tin người dùng"}), 404
+                
+                if not hasattr(user, 'is_admin') or not user.is_admin:
+                    return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
+            except Exception as access_error:
+                # Log lỗi và trả về thông báo chung về quyền truy cập
+                current_app.logger.error(f"Error checking admin access: {str(access_error)}")
+                return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
+        
+        return jsonify(order.to_dict()), 200
+    except Exception as e:
+        return jsonify({"error": f"Không thể tải thông tin đơn hàng: {str(e)}"}), 404
 
 @bp.route('', methods=['POST'])
 @jwt_required()
@@ -57,10 +69,10 @@ def create_order():
         if 'shippingInfo' in data:
             shipping_info = data['shippingInfo']
             order_data = {
-                'shipping_address': f"{shipping_info.get('address')}, {shipping_info.get('ward')}, {shipping_info.get('district')}",
+                'shipping_address': f"{shipping_info.get('address')}, {shipping_info.get('city')}",
                 'shipping_city': shipping_info.get('city'),
                 'shipping_phone': shipping_info.get('phone'),
-                'payment_method': data.get('paymentMethod') or shipping_info.get('paymentMethod'),
+                'payment_method': data.get('paymentMethod'),
                 'notes': shipping_info.get('notes', '')
             }
         else:
@@ -69,7 +81,7 @@ def create_order():
                 'shipping_address': data.get('shipping_address'),
                 'shipping_city': data.get('shipping_city'),
                 'shipping_phone': data.get('shipping_phone'),
-                'payment_method': data.get('payment_method'),
+                'payment_method': data.get('payment_method') or data.get('paymentMethod'),
                 'notes': data.get('notes', '')
             }
         
@@ -77,6 +89,15 @@ def create_order():
         errors = validate_order_data(order_data)
         if errors:
             return jsonify({"error": str(errors)}), 400
+            
+        # Chuẩn hóa payment_method
+        if order_data['payment_method']:
+            order_data['payment_method'] = order_data['payment_method'].lower()
+            
+        # Kiểm tra phương thức thanh toán hợp lệ
+        valid_payment_methods = ['cod', 'vnpay']
+        if order_data['payment_method'] not in valid_payment_methods:
+            return jsonify({"error": f"Phương thức thanh toán không hợp lệ. Chỉ hỗ trợ: {', '.join(valid_payment_methods)}"}), 400
         
         # Lấy thông tin giỏ hàng
         if 'items' in data:

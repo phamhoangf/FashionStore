@@ -40,8 +40,7 @@ const ProductCard = React.memo(({ product }) => {
     // Thêm sản phẩm vào giỏ hàng với thông tin đầy đủ
     addItem(product.id, 1);
     
-    // Hiển thị thông báo thành công
-    alert('Đã thêm sản phẩm vào giỏ hàng!');
+    // Không cần alert nữa vì notification modal đã được xử lý trong CartContext
   }, [addItem, isAuthenticated, navigate, product.id]);
   
   // Xử lý sự kiện khi ảnh tải xong

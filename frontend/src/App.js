@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -6,6 +6,10 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
+
+// Import chatbot components
+import ChatbotButton from './components/ChatbotButton';
+import ChatbotModal from './components/ChatbotModal';
 
 // Lazy load components
 const Layout = React.lazy(() => import('./components/layout/Layout'));
@@ -40,6 +44,9 @@ const LoadingSpinner = React.memo(() => (
 ));
 
 const App = () => {
+  // State for chatbot modal
+  const [showChatbot, setShowChatbot] = useState(false);
+  
   // Memoize the routes configuration
   const routes = useMemo(() => (
     <Routes>
@@ -76,10 +83,18 @@ const App = () => {
     </Routes>
   ), []);
 
+  const handleOpenChatbot = () => {
+    setShowChatbot(true);
+  };
+
+  const handleCloseChatbot = () => {
+    setShowChatbot(false);
+  };
+
   return (
-    <AuthProvider>
-      <CartProvider>
-        <Router>
+    <Router>
+      <AuthProvider>
+        <CartProvider>
           <React.Suspense fallback={<LoadingSpinner />}>
             {routes}
             <ToastContainer
@@ -93,10 +108,14 @@ const App = () => {
               draggable
               pauseOnHover
             />
+            
+            {/* Chatbot components */}
+            <ChatbotButton onClick={handleOpenChatbot} />
+            <ChatbotModal show={showChatbot} onHide={handleCloseChatbot} />
           </React.Suspense>
-        </Router>
-      </CartProvider>
-    </AuthProvider>
+        </CartProvider>
+      </AuthProvider>
+    </Router>
   );
 };
 

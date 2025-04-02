@@ -81,30 +81,76 @@ const CheckoutPage = () => {
         }))
       };
 
+      console.log('Sending order data:', orderData);
+
       // Tạo đơn hàng
       const order = await createOrder(orderData);
+      console.log('Order created:', order);
       
       // Xử lý thanh toán
       if (formData.paymentMethod === 'vnpay') {
-        // Nếu thanh toán qua VNPay, chuyển hướng đến trang thanh toán
-        const paymentResponse = await payWithVNPay(order.id);
-        if (paymentResponse && paymentResponse.payment_url) {
-          // Xóa giỏ hàng
-          clearCart();
-          // Chuyển hướng đến trang thanh toán VNPay
-          window.location.href = paymentResponse.payment_url;
-        } else {
-          throw new Error('Không thể tạo URL thanh toán');
+        try {
+          // Nếu thanh toán qua VNPay, chuyển hướng đến trang thanh toán
+          const paymentResponse = await payWithVNPay(order.id);
+          console.log('Payment response:', paymentResponse);
+          if (paymentResponse && paymentResponse.payment_url) {
+            // Xóa giỏ hàng trước khi chuyển hướng
+            await clearCart(true);
+            
+            // Force immediate visual update of the cart badge
+            try {
+              const cartBadges = document.querySelectorAll('.position-absolute.badge');
+              cartBadges.forEach(badge => {
+                if (badge.parentElement?.textContent.includes('Giỏ hàng')) {
+                  badge.style.display = 'none';
+                }
+              });
+            } catch (domError) {
+              console.error('DOM update failed:', domError);
+            }
+            
+            console.log('Cart cleared before VNPay redirect');
+            // Chuyển hướng đến trang thanh toán VNPay
+            window.location.href = paymentResponse.payment_url;
+          } else {
+            throw new Error('Không thể tạo URL thanh toán');
+          }
+        } catch (paymentError) {
+          console.error('VNPay payment error:', paymentError);
+          setError(paymentError.message || 'Lỗi khi tạo thanh toán VNPay');
+          setLoading(false);
+          return;
         }
       } else {
-        // Nếu thanh toán khi nhận hàng, chuyển hướng đến trang xác nhận đơn hàng
-        clearCart();
+        // Nếu thanh toán khi nhận hàng (COD), xóa giỏ hàng và chuyển hướng đến trang thành công
+        console.log('Processing COD payment for order:', order.id);
+        
+        // Xóa giỏ hàng trước khi chuyển hướng
+        await clearCart(true);
+        
+        // Force immediate visual update of the cart badge
+        try {
+          const cartBadges = document.querySelectorAll('.position-absolute.badge');
+          cartBadges.forEach(badge => {
+            if (badge.parentElement?.textContent.includes('Giỏ hàng')) {
+              badge.style.display = 'none';
+            }
+          });
+        } catch (domError) {
+          console.error('DOM update failed:', domError);
+        }
+        
+        console.log('Cart cleared before redirecting to success page');
         navigate(`/order-success/${order.id}`);
       }
     } catch (error) {
       console.error('Checkout error:', error);
-      setError(error.message || 'Đã xảy ra lỗi khi đặt hàng. Vui lòng thử lại sau.');
-    } finally {
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        setError(error.response?.data?.error || error.message || 'Đã xảy ra lỗi khi đặt hàng. Vui lòng thử lại sau.');
+      } else {
+        setError(error.message || 'Đã xảy ra lỗi khi đặt hàng. Vui lòng thử lại sau.');
+      }
       setLoading(false);
     }
   };

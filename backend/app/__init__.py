@@ -5,9 +5,17 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 import os
 from .config import Config
+import logging
+from flask_marshmallow import Marshmallow
+
+# Set up logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 db = SQLAlchemy()
 migrate = Migrate()
+ma = Marshmallow()
 jwt = JWTManager()
 
 def create_app(config_class=Config):
@@ -40,6 +48,7 @@ def create_app(config_class=Config):
     # Khởi tạo extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    ma.init_app(app)
     
     # Cấu hình JWT
     app.config['JWT_TOKEN_LOCATION'] = ['headers']
@@ -96,11 +105,33 @@ def create_app(config_class=Config):
             'message': 'Token đã hết hạn, vui lòng đăng nhập lại'
         }), 401
     
-    # Cấu hình CORS - cho phép Frontend truy cập API
+    # Cấu hình CORS
     CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+    
+    # Global error handler
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        app.logger.error(f"Unhandled exception: {str(e)}")
+        
+        # Xử lý lỗi SQLAlchemy
+        if hasattr(e, 'orig') and e.orig:
+            app.logger.error(f"Database error: {str(e.orig)}")
+            return jsonify({"error": "Lỗi cơ sở dữ liệu. Vui lòng thử lại sau."}), 500
+            
+        # Xử lý lỗi 404 Not Found
+        if isinstance(e, db.exc.NoResultFound) or '404' in str(e):
+            return jsonify({"error": "Không tìm thấy tài nguyên yêu cầu."}), 404
+            
+        # Xử lý lỗi ValueError
+        if isinstance(e, ValueError):
+            return jsonify({"error": str(e)}), 400
+            
+        # Các lỗi khác
+        return jsonify({"error": "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại sau."}), 500
     
     # Import và đăng ký blueprint
     from app.routes import auth, products, categories, cart, orders, payment, admin, debug
+    from app.routes.chatbot import chatbot_blueprint
     
     app.register_blueprint(auth.bp)
     app.register_blueprint(products.bp)
@@ -110,6 +141,7 @@ def create_app(config_class=Config):
     app.register_blueprint(payment.bp)
     app.register_blueprint(admin.bp)
     app.register_blueprint(debug.bp)
+    app.register_blueprint(chatbot_blueprint, url_prefix='/api/chatbot')
     
     # Route đơn giản để phục vụ file ảnh từ thư mục uploads
     @app.route('/uploads/<path:filename>')

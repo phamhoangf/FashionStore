@@ -45,3 +45,32 @@ export const getCategories = async () => {
     return [];
   }
 };
+
+export const getBrands = async () => {
+  try {
+    const response = await api.get('/brands');
+    console.log('API response for brands:', response);
+    
+    // Kiểm tra xem response có phải là mảng không
+    if (Array.isArray(response)) {
+      // Nếu là mảng, trả về trực tiếp
+      return response;
+    } else if (response && Array.isArray(response.items)) {
+      // Nếu là object có thuộc tính items là mảng, trả về response.items
+      return response.items;
+    } else {
+      // Trường hợp khác, trả về mảng rỗng
+      console.error('Unexpected brands response format:', response);
+      return [];
+    }
+  } catch (error) {
+    console.error('Error fetching brands:', error);
+    // Return dummy data until the API is implemented
+    return [
+      { id: 1, name: 'Nike', productCount: 12 },
+      { id: 2, name: 'Adidas', productCount: 8 },
+      { id: 3, name: 'Puma', productCount: 5 },
+      { id: 4, name: 'Reebok', productCount: 3 }
+    ];
+  }
+};

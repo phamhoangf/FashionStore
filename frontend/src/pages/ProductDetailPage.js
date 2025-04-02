@@ -83,7 +83,7 @@ const ProductDetailPage = () => {
     
     if (product) {
       addItem(product.id, quantity);
-      alert('Đã thêm sản phẩm vào giỏ hàng!');
+      // Notification is now handled in CartContext
     }
   }, [addItem, isAuthenticated, product, quantity]);
 

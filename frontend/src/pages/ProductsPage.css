@@ -114,4 +114,64 @@
 .filter-divider {
   margin: 1rem 0;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Price Range Filter */
+.price-range-container {
+  padding: 0 5px;
+}
+
+.price-range-values {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.rc-slider {
+  margin: 15px 0;
+}
+
+.rc-slider-handle {
+  border-color: #0d6efd;
+  background-color: #0d6efd;
+}
+
+.rc-slider-track {
+  background-color: #0d6efd;
+}
+
+/* Checkbox filters */
+.checkbox-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.checkbox-item .form-check-input {
+  margin-right: 8px;
+}
+
+.checkbox-item .form-check-label {
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.checkbox-item:hover {
+  color: #0d6efd;
+}
+
+.checkbox-count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: #6c757d;
+  background-color: #f1f1f1;
+  border-radius: 10px;
+  padding: 0 6px;
 } 

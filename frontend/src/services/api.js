@@ -81,15 +81,26 @@ api.interceptors.response.use(
           }, 2000);
         }
       }
+      
+      // Chuẩn hóa lỗi từ server để dễ xử lý
+      const responseError = new Error(
+        error.response.data?.error || 
+        error.response.data?.message || 
+        'Lỗi từ máy chủ'
+      );
+      responseError.status = error.response.status;
+      responseError.response = error.response;
+      return Promise.reject(responseError);
+      
     } else if (error.request) {
       // Lỗi không nhận được response
       console.error('API Request Error (No Response):', error.request);
+      return Promise.reject(new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.'));
     } else {
       // Lỗi khác
       console.error('API Error:', error.message);
+      return Promise.reject(new Error(error.message || 'Đã xảy ra lỗi không xác định.'));
     }
-    
-    return Promise.reject(error);
   }
 );
 

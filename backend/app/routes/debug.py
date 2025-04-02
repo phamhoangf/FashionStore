@@ -17,6 +17,18 @@ def get_config():
     }
     return jsonify(config)
 
+@bp.route('/payment-config', methods=['GET'])
+def get_payment_config():
+    """Lấy thông tin cấu hình thanh toán VNPay (ẩn thông tin nhạy cảm)"""
+    payment_config = {
+        'VNPAY_TMN_CODE': current_app.config.get('VNPAY_TMN_CODE', 'Not configured'),
+        'VNPAY_HASH_SECRET_KEY': '********' if current_app.config.get('VNPAY_HASH_SECRET_KEY') else 'Not configured',
+        'VNPAY_PAYMENT_URL': current_app.config.get('VNPAY_PAYMENT_URL', 'Not configured'),
+        'VNPAY_RETURN_URL': current_app.config.get('VNPAY_RETURN_URL', 'Not configured'),
+        'FRONTEND_URL': current_app.config.get('FRONTEND_URL', 'Not configured')
+    }
+    return jsonify(payment_config)
+
 @bp.route('/image', methods=['GET'])
 def check_image():
     """Kiểm tra đường dẫn ảnh"""
