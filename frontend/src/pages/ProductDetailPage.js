@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getProductById } from '../services/productService';
+import { getProductById, getProducts } from '../services/productService';
 import { CartContext } from '../context/CartContext';
 import { AuthContext } from '../context/AuthContext';
 import { formatImageUrl } from '../utils/imageUtils';
+import ProductCard from '../components/product/ProductCard';
 import './ProductDetailPage.css';
 
 // Ảnh mặc định khi không có ảnh
@@ -22,6 +23,7 @@ const ProductDetailPage = () => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageSrc, setImageSrc] = useState('');
+  const [similarProducts, setSimilarProducts] = useState([]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -54,6 +56,37 @@ const ProductDetailPage = () => {
 
     fetchProduct();
   }, [id]);
+
+  // Thêm useEffect mới để lấy sản phẩm tương tự
+  useEffect(() => {
+    const fetchSimilarProducts = async () => {
+      if (!product) return;
+      
+      try {
+        // Chỉ lấy sản phẩm cùng danh mục
+        const response = await getProducts({
+          category: product.category_id,
+          limit: 8 // Lấy nhiều hơn để sau khi lọc vẫn còn đủ sản phẩm
+        });
+        
+        console.log('Similar products response:', response);
+        
+        if (response && response.items) {
+          // Lọc ra sản phẩm hiện tại từ danh sách
+          const filtered = response.items.filter(item => item.id !== product.id);
+          
+          // Giới hạn số lượng sản phẩm hiển thị (chọn 4 sản phẩm đầu tiên)
+          setSimilarProducts(filtered.slice(0, 8));
+        }
+      } catch (error) {
+        console.error('Error fetching similar products:', error);
+      }
+    };
+
+    if (product) {
+      fetchSimilarProducts();
+    }
+  }, [product]);
 
   const handleQuantityChange = useCallback((e) => {
     const value = parseInt(e.target.value);
@@ -235,6 +268,24 @@ const ProductDetailPage = () => {
           </div>
         </div>
       </div>
+      
+      {/* Thêm section cho sản phẩm tương tự */}
+      <section className="mt-5">
+        <h2 className="mb-4">Sản phẩm tương tự</h2>
+        <div className="row">
+          {similarProducts.length > 0 ? (
+            similarProducts.map(product => (
+              <div key={product.id} className="col-md-3 mb-4">
+                <ProductCard product={product} />
+              </div>
+            ))
+          ) : (
+            <div className="col-12 text-center">
+              <p>Không có sản phẩm tương tự.</p>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 };

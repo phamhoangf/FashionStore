@@ -8,22 +8,66 @@ import axios from 'axios';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const ChatbotModal = ({ show, onHide }) => {
-  const [messages, setMessages] = useState([
-    { 
-      text: "Xin chào! Tôi là trợ lý ảo của cửa hàng. Tôi có thể giúp gì cho bạn?", 
-      sender: 'bot',
-      timestamp: new Date()
+  // Khởi tạo với tin nhắn chào mừng hoặc load từ localStorage
+  const [messages, setMessages] = useState(() => {
+    const savedMessages = localStorage.getItem('chatbot_messages');
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages);
+        // Đảm bảo ngày tháng được chuyển đổi đúng định dạng
+        return parsedMessages.map(msg => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+      } catch (e) {
+        console.error('Error parsing saved messages:', e);
+        return getDefaultWelcomeMessage();
+      }
+    } else {
+      return getDefaultWelcomeMessage();
     }
-  ]);
+  });
+  
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
 
+  // Hàm trả về tin nhắn chào mừng mặc định
+  function getDefaultWelcomeMessage() {
+    return [{ 
+      text: "Xin chào! Tôi là trợ lý ảo của cửa hàng. Tôi có thể giúp gì cho bạn?", 
+      sender: 'bot',
+      timestamp: new Date()
+    }];
+  }
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Lưu tin nhắn vào localStorage khi có thay đổi
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('chatbot_messages', JSON.stringify(messages));
+    }
+  }, [messages]);
+
+  // Lắng nghe sự kiện đăng xuất để reset chat
+  useEffect(() => {
+    const resetChatOnLogout = () => {
+      console.log('Resetting chatbot messages due to logout');
+      setMessages(getDefaultWelcomeMessage());
+      localStorage.removeItem('chatbot_messages');
+    };
+
+    window.addEventListener('user-logout', resetChatOnLogout);
+    
+    return () => {
+      window.removeEventListener('user-logout', resetChatOnLogout);
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -47,8 +91,8 @@ const ChatbotModal = ({ show, onHide }) => {
 
     try {
       // Send request to backend
-      console.log(`Sending question to ${API_URL}/api/chatbot/ask`);
-      const response = await axios.post(`${API_URL}/api/chatbot/ask`, {
+      console.log(`Sending question to ${API_URL}/chatbot/ask`);
+      const response = await axios.post(`${API_URL}/chatbot/ask`, {
         question: userMessage.text
       });
 
@@ -59,7 +103,6 @@ const ChatbotModal = ({ show, onHide }) => {
         text: response.data.answer,
         sender: 'bot',
         timestamp: new Date(),
-        sources: response.data.sources
       }]);
     } catch (err) {
       console.error('Error getting chatbot response:', err);

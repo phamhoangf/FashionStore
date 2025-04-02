@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Modal, Button } from 'react-bootstrap';
 import api from '../../services/api';
 
 const OrderList = () => {
@@ -12,6 +13,11 @@ const OrderList = () => {
   const [dateRange, setDateRange] = useState({
     startDate: '',
     endDate: ''
+  });
+  const [showModal, setShowModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState({
+    orderId: null,
+    status: null
   });
 
   const statusOptions = [
@@ -49,8 +55,7 @@ const OrderList = () => {
       setTotalPages(response.pages || 1);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching orders:', error);
-      setError('Không thể tải danh sách đơn hàng');
+      setError(error.response?.data?.error || 'Không thể tải danh sách đơn hàng');
       setLoading(false);
     }
   };
@@ -69,16 +74,38 @@ const OrderList = () => {
     setCurrentPage(1); // Reset về trang 1 khi thay đổi bộ lọc
   };
 
-  const handleStatusUpdate = async (orderId, newStatus) => {
-    if (window.confirm(`Bạn có chắc chắn muốn cập nhật trạng thái đơn hàng thành "${statusOptions.find(s => s.value === newStatus)?.label}"?`)) {
-      try {
-        await api.put(`/admin/orders/${orderId}/status`, { status: newStatus });
-        // Cập nhật lại danh sách đơn hàng
-        fetchOrders();
-      } catch (error) {
-        console.error('Error updating order status:', error);
-        alert('Không thể cập nhật trạng thái đơn hàng');
-      }
+  // Mở modal xác nhận
+  const openConfirmModal = (orderId, newStatus) => {
+    setPendingAction({
+      orderId,
+      status: newStatus
+    });
+    setShowModal(true);
+  };
+
+  // Đóng modal
+  const closeModal = () => {
+    setShowModal(false);
+    setPendingAction({
+      orderId: null,
+      status: null
+    });
+  };
+
+  // Xử lý cập nhật trạng thái
+  const handleStatusUpdate = async () => {
+    const { orderId, status } = pendingAction;
+    if (!orderId || !status) return;
+
+    try {
+      setLoading(true);
+      await api.put(`/admin/orders/${orderId}/status`, { status });
+      closeModal();
+      await fetchOrders(); // Cập nhật lại danh sách đơn hàng
+      setLoading(false);
+    } catch (error) {
+      setError(error.response?.data?.error || 'Không thể cập nhật trạng thái đơn hàng');
+      setLoading(false);
     }
   };
 
@@ -165,118 +192,118 @@ const OrderList = () => {
   }
 
   return (
-    <div className="container-fluid py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1>Quản lý đơn hàng</h1>
-      </div>
-      
-      {error && (
-        <div className="alert alert-danger" role="alert">
-          {error}
+    <>
+      <div className="container-fluid py-4">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h1>Quản lý đơn hàng</h1>
         </div>
-      )}
-      
-      <div className="card mb-4">
-        <div className="card-body">
-          <div className="row g-3">
-            <div className="col-md-4">
-              <label htmlFor="status" className="form-label">Trạng thái</label>
-              <select
-                className="form-select"
-                id="status"
-                value={selectedStatus}
-                onChange={handleStatusChange}
-              >
-                {statusOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-md-3">
-              <label htmlFor="startDate" className="form-label">Từ ngày</label>
-              <input
-                type="date"
-                className="form-control"
-                id="startDate"
-                name="startDate"
-                value={dateRange.startDate}
-                onChange={handleDateChange}
-              />
-            </div>
-            <div className="col-md-3">
-              <label htmlFor="endDate" className="form-label">Đến ngày</label>
-              <input
-                type="date"
-                className="form-control"
-                id="endDate"
-                name="endDate"
-                value={dateRange.endDate}
-                onChange={handleDateChange}
-              />
-            </div>
-            <div className="col-md-2 d-flex align-items-end">
-              <button
-                type="button"
-                className="btn btn-outline-secondary w-100"
-                onClick={() => {
-                  setSelectedStatus('');
-                  setDateRange({ startDate: '', endDate: '' });
-                  setCurrentPage(1);
-                }}
-              >
-                Đặt lại
-              </button>
+        
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
+          </div>
+        )}
+        
+        <div className="card mb-4">
+          <div className="card-body">
+            <div className="row g-3">
+              <div className="col-md-4">
+                <label htmlFor="status" className="form-label">Trạng thái</label>
+                <select
+                  className="form-select"
+                  id="status"
+                  value={selectedStatus}
+                  onChange={handleStatusChange}
+                >
+                  {statusOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-md-3">
+                <label htmlFor="startDate" className="form-label">Từ ngày</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  id="startDate"
+                  name="startDate"
+                  value={dateRange.startDate}
+                  onChange={handleDateChange}
+                />
+              </div>
+              <div className="col-md-3">
+                <label htmlFor="endDate" className="form-label">Đến ngày</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  id="endDate"
+                  name="endDate"
+                  value={dateRange.endDate}
+                  onChange={handleDateChange}
+                />
+              </div>
+              <div className="col-md-2 d-flex align-items-end">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary w-100"
+                  onClick={() => {
+                    setSelectedStatus('');
+                    setDateRange({ startDate: '', endDate: '' });
+                    setCurrentPage(1);
+                  }}
+                >
+                  Đặt lại
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      
-      <div className="card">
-        <div className="card-header">
-          <i className="bi bi-cart-check me-1"></i>
-          Danh sách đơn hàng
-        </div>
-        <div className="card-body">
-          <div className="table-responsive">
-            <table className="table table-striped table-hover">
-              <thead>
-                <tr>
-                  <th>Mã đơn</th>
-                  <th>Khách hàng</th>
-                  <th>Ngày đặt</th>
-                  <th>Tổng tiền</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.length > 0 ? (
-                  orders.map(order => (
-                    <tr key={order.id}>
-                      <td>#{order.id}</td>
-                      <td>
-                        <div>{order.customer_name}</div>
-                        <small className="text-muted">{order.customer_phone}</small>
-                      </td>
-                      <td>{formatDate(order.created_at)}</td>
-                      <td>{formatCurrency(order.total_amount)}</td>
-                      <td>
-                        <span className={`badge ${getStatusBadgeClass(order.status)}`}>
-                          {getStatusText(order.status)}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link
-                            to={`/admin/orders/${order.id}`}
-                            className="btn btn-sm btn-info"
-                          >
-                            <i className="bi bi-eye"></i>
-                          </Link>
-                          
-                          <div className="dropdown">
+        
+        <div className="card">
+          <div className="card-header">
+            <i className="bi bi-cart-check me-1"></i>
+            Danh sách đơn hàng
+          </div>
+          <div className="card-body">
+            <div className="table-responsive">
+              <table className="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>Mã đơn</th>
+                    <th>Khách hàng</th>
+                    <th>Ngày đặt</th>
+                    <th>Tổng tiền</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.length > 0 ? (
+                    orders.map(order => (
+                      <tr key={order.id}>
+                        <td>#{order.id}</td>
+                        <td>
+                          <div>{order.customer_name}</div>
+                          <small className="text-muted">{order.customer_phone}</small>
+                        </td>
+                        <td>{formatDate(order.created_at)}</td>
+                        <td>{formatCurrency(order.total_amount)}</td>
+                        <td>
+                          <span className={`badge ${getStatusBadgeClass(order.status)}`}>
+                            {getStatusText(order.status)}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            <Link
+                              to={`/admin/orders/${order.id}`}
+                              className="btn btn-sm btn-info"
+                            >
+                              <i className="bi bi-eye"></i>
+                            </Link>
+                            
                             <button
                               className="btn btn-sm btn-secondary dropdown-toggle"
                               type="button"
@@ -292,7 +319,7 @@ const OrderList = () => {
                                   <li>
                                     <button
                                       className="dropdown-item"
-                                      onClick={() => handleStatusUpdate(order.id, 'confirmed')}
+                                      onClick={() => openConfirmModal(order.id, 'confirmed')}
                                     >
                                       Xác nhận đơn hàng
                                     </button>
@@ -300,7 +327,7 @@ const OrderList = () => {
                                   <li>
                                     <button
                                       className="dropdown-item text-danger"
-                                      onClick={() => handleStatusUpdate(order.id, 'cancelled')}
+                                      onClick={() => openConfirmModal(order.id, 'cancelled')}
                                     >
                                       Hủy đơn hàng
                                     </button>
@@ -312,7 +339,7 @@ const OrderList = () => {
                                 <li>
                                   <button
                                     className="dropdown-item"
-                                    onClick={() => handleStatusUpdate(order.id, 'shipping')}
+                                    onClick={() => openConfirmModal(order.id, 'shipping')}
                                   >
                                     Chuyển sang đang giao hàng
                                   </button>
@@ -323,7 +350,7 @@ const OrderList = () => {
                                 <li>
                                   <button
                                     className="dropdown-item"
-                                    onClick={() => handleStatusUpdate(order.id, 'delivered')}
+                                    onClick={() => openConfirmModal(order.id, 'delivered')}
                                   >
                                     Xác nhận đã giao hàng
                                   </button>
@@ -331,29 +358,50 @@ const OrderList = () => {
                               )}
                             </ul>
                           </div>
-                        </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="text-center">
+                        Không có đơn hàng nào
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6" className="text-center">
-                      Không có đơn hàng nào
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          {totalPages > 1 && (
-            <div className="d-flex justify-content-center mt-4">
-              {renderPagination()}
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
+            
+            {totalPages > 1 && (
+              <div className="d-flex justify-content-center mt-4">
+                {renderPagination()}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+      
+      {/* Modal xác nhận cập nhật trạng thái */}
+      <Modal show={showModal} onHide={closeModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Xác nhận thay đổi trạng thái</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Bạn có chắc chắn muốn cập nhật trạng thái đơn hàng thành "{pendingAction.status && statusOptions.find(s => s.value === pendingAction.status)?.label}"?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeModal}>
+            Hủy
+          </Button>
+          <Button 
+            variant={pendingAction.status === 'cancelled' ? 'danger' : 'primary'} 
+            onClick={handleStatusUpdate}
+          >
+            Xác nhận
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </>
   );
 };
 

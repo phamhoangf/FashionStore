@@ -141,6 +141,22 @@ export const CartProvider = ({ children }) => {
     }
   }, [isAuthenticated, tempCart]);
 
+  // Lắng nghe sự kiện user-logout để xóa giỏ hàng
+  useEffect(() => {
+    const handleLogout = () => {
+      console.log('Logout detected, clearing cart data');
+      setCart({ items: [], total: 0, total_items: 0 });
+      localStorage.removeItem('cart');
+      localStorage.removeItem('tempCart');
+    };
+
+    window.addEventListener('user-logout', handleLogout);
+    
+    return () => {
+      window.removeEventListener('user-logout', handleLogout);
+    };
+  }, []);
+
   const addItem = async (productId, quantity) => {
     try {
       let product = null;

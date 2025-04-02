@@ -9,6 +9,7 @@ import numpy as np
 from pathlib import Path
 
 # Langchain imports
+from google import genai
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -27,6 +28,7 @@ EMBEDDINGS_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 TOP_K_RESULTS = 5  # Increased to get more context
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") 
 
 class RAGChatbot:
     """RAG-based Chatbot class for customer support"""
@@ -163,7 +165,7 @@ class RAGChatbot:
                 # Make sure parent directory exists
                 os.makedirs(os.path.dirname(full_path), exist_ok=True)
                 logger.info(f"Saving vector store to {full_path}")
-                vectorstore.save_local(str(FAISS_INDEX_PATH))
+                vectorstore.save_local("vector_store")
                 logger.info(f"Vector store saved to {FAISS_INDEX_PATH}")
             except Exception as e:
                 logger.error(f"Failed to save vector store: {e}")
@@ -206,25 +208,19 @@ class RAGChatbot:
                 question=question,
                 context=context_text
             )
-            
-            # For simplicity, we'll use a rule-based approach for common questions
-            # In a production environment, you would use an LLM like OpenAI's GPT here
-            answer = self._direct_qa_match(question, contexts)
-            
-            if not answer or answer.startswith("Xin lỗi"):
-                # If no direct match, try keyword-based approach
-                answer = self._rule_based_answers(question, contexts)
-            
-            if not answer or answer.startswith("Xin lỗi"):
-                # If still no answer, extract relevant sentences
-                answer = self._extract_relevant_sentences(question, contexts)
+
+            # Use gemini from google
+            client = genai.Client(api_key=GOOGLE_API_KEY)
+            model_name = "gemini-2.0-flash"
+            answer = client.models.generate_content(contents=prompt_text, model=model_name).text
             
             logger.info(f"Generated answer: {answer[:100]}...")
             
-            return {
-                "answer": answer,
-                "sources": sources
-            }
+            # return {
+            #     "answer": answer,
+            #     "sources": sources
+            # }
+            return {"answer": answer}
         except Exception as e:
             logger.error(f"Error getting answer: {e}")
             logger.error(traceback.format_exc())
@@ -232,202 +228,6 @@ class RAGChatbot:
                 "answer": "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau hoặc liên hệ với bộ phận hỗ trợ của chúng tôi.",
                 "sources": []
             }
-    
-    def _direct_qa_match(self, question: str, contexts: List[str]) -> str:
-        """
-        Try to find a direct question-answer pair match
-        
-        Args:
-            question: The user's question
-            contexts: Retrieved context passages
-            
-        Returns:
-            A direct answer if found, otherwise empty string
-        """
-        try:
-            question_lower = question.lower()
-            
-            # Extract potential answers from the contexts based on question-answer format
-            for context in contexts:
-                lines = context.split('\n')
-                for i, line in enumerate(lines):
-                    if ('câu hỏi:' in line.lower() or '?' in line) and i+1 < len(lines):
-                        # Check if this question is similar to the user question
-                        if self._is_similar_question(question_lower, line.lower()):
-                            # Get the answer (typically in the next line)
-                            answer_line = lines[i+1].strip()
-                            if answer_line.lower().startswith('trả lời:'):
-                                return answer_line.replace('Trả lời:', '').strip()
-                            elif i+2 < len(lines) and not lines[i+2].lower().startswith('câu hỏi:'):
-                                # Return both the answer line and the next line if it's not a new question
-                                return answer_line + ' ' + lines[i+2].strip()
-                            else:
-                                return answer_line
-            
-            return ""
-        except Exception as e:
-            logger.error(f"Error in direct QA match: {e}")
-            return ""
-    
-    def _rule_based_answers(self, question: str, contexts: List[str]) -> str:
-        """
-        Simple rule-based answering system
-        In a production environment, replace this with an actual LLM
-        
-        Args:
-            question: The user's question
-            contexts: Retrieved context passages
-            
-        Returns:
-            A generated answer
-        """
-        try:
-            # Lowercase question for easier matching
-            question_lower = question.lower()
-            
-            # Extract potential answers from the contexts
-            potential_answers = []
-            for context in contexts:
-                lines = context.split('\n')
-                for i, line in enumerate(lines):
-                    # Look for question patterns
-                    if "câu hỏi:" in line.lower() or "?" in line:
-                        # Check if this question is similar to the user question
-                        if self._is_similar_question(question_lower, line.lower()):
-                            # Get the answer (assume it's in the next line)
-                            if i + 1 < len(lines) and lines[i + 1].strip():
-                                if lines[i + 1].lower().startswith("trả lời:"):
-                                    potential_answers.append(lines[i + 1].replace("Trả lời:", "").strip())
-                                else:
-                                    potential_answers.append(lines[i + 1].strip())
-            
-            # If we found potential answers, return the first one
-            if potential_answers:
-                return potential_answers[0]
-            
-            # If no direct Q&A match, look for keyword matches
-            keywords = self._extract_keywords(question_lower)
-            
-            # Store sentences containing keywords
-            matching_sentences = []
-            
-            for context in contexts:
-                context_lower = context.lower()
-                for keyword in keywords:
-                    if keyword in context_lower:
-                        # Find the sentences containing the keyword
-                        sentences = context.replace('\n', ' ').split('.')
-                        for sentence in sentences:
-                            if keyword in sentence.lower() and len(sentence.split()) > 3:
-                                matching_sentences.append(sentence.strip() + ".")
-            
-            # Return most relevant sentences (up to 3)
-            if matching_sentences:
-                # Count keyword occurrences in each sentence
-                sentence_scores = []
-                for sentence in matching_sentences:
-                    score = sum(1 for keyword in keywords if keyword in sentence.lower())
-                    sentence_scores.append((score, sentence))
-                
-                # Sort by score and return top sentences
-                sentence_scores.sort(reverse=True)
-                return " ".join([s[1] for s in sentence_scores[:3]])
-            
-            # Default response if no match found
-            return "Xin lỗi, tôi không có thông tin cụ thể về câu hỏi của bạn. Vui lòng liên hệ với bộ phận chăm sóc khách hàng qua số 1900-1234 hoặc email support@example.com để được hỗ trợ trực tiếp."
-        except Exception as e:
-            logger.error(f"Error in rule-based answers: {e}")
-            return "Xin lỗi, tôi không thể trả lời câu hỏi này. Vui lòng liên hệ với bộ phận hỗ trợ khách hàng."
-    
-    def _extract_relevant_sentences(self, question: str, contexts: List[str]) -> str:
-        """
-        Extract sentences that might be relevant to the question
-        
-        Args:
-            question: The user's question
-            contexts: Retrieved context passages
-            
-        Returns:
-            Combined relevant sentences
-        """
-        try:
-            # Extract keywords from question
-            keywords = self._extract_keywords(question.lower())
-            
-            if not keywords:
-                return "Xin lỗi, tôi không hiểu câu hỏi của bạn. Vui lòng cung cấp thêm thông tin."
-            
-            # Combine contexts into one text
-            combined_text = ' '.join(contexts)
-            
-            # Split into sentences
-            sentences = combined_text.replace('\n', ' ').split('.')
-            
-            # Score sentences by keyword matches
-            scored_sentences = []
-            for sentence in sentences:
-                sentence = sentence.strip()
-                if len(sentence) < 10:  # Skip very short sentences
-                    continue
-                
-                # Count keyword occurrences
-                score = sum(1 for keyword in keywords if keyword in sentence.lower())
-                if score > 0:
-                    scored_sentences.append((score, sentence))
-            
-            # Sort by score
-            scored_sentences.sort(reverse=True)
-            
-            # Take top 3 sentences
-            top_sentences = [s[1] + '.' for s in scored_sentences[:3]]
-            
-            if top_sentences:
-                return ' '.join(top_sentences)
-            else:
-                return "Xin lỗi, tôi không tìm thấy thông tin liên quan đến câu hỏi của bạn."
-        except Exception as e:
-            logger.error(f"Error extracting relevant sentences: {e}")
-            return "Xin lỗi, tôi không thể tìm thấy câu trả lời phù hợp."
-    
-    def _is_similar_question(self, query: str, candidate: str) -> bool:
-        """Check if two questions are similar based on keyword overlap"""
-        try:
-            # Clean the candidate
-            candidate = candidate.replace('câu hỏi:', '').strip()
-            
-            query_keywords = self._extract_keywords(query)
-            candidate_keywords = self._extract_keywords(candidate)
-            
-            if not query_keywords or not candidate_keywords:
-                return False
-            
-            # Count matching keywords
-            matches = sum(1 for keyword in query_keywords if any(keyword in cand for cand in candidate_keywords))
-            
-            # Consider similar if at least 2 keywords match or 50% of keywords match
-            threshold = min(2, len(query_keywords) * 0.5)
-            return matches >= threshold
-        except Exception as e:
-            logger.error(f"Error comparing questions: {e}")
-            return False
-    
-    def _extract_keywords(self, text: str) -> List[str]:
-        """Extract keywords from text (simplified)"""
-        try:
-            # Remove common Vietnamese stopwords
-            stopwords = ['và', 'hoặc', 'là', 'của', 'cho', 'trong', 'với', 'có', 'được', 'không', 
-                        'về', 'tôi', 'bạn', 'làm', 'thế', 'nào', 'gì', 'vì', 'sao', 'khi', 'từ', 
-                        'lúc', 'đã', 'rồi', 'sẽ', 'bởi', 'tại', 'cần', 'như', 'ở', 'một', 'các',
-                        'những', 'để', 'mà', 'này', 'đó', 'thì', 'nên', 'vậy', 'phải', 'đến', 'theo']
-            
-            # Split text and filter out stopwords and short words
-            words = text.replace('?', ' ').replace('.', ' ').replace(',', ' ').lower().split()
-            keywords = [word for word in words if word not in stopwords and len(word) > 2]
-            
-            return keywords
-        except Exception as e:
-            logger.error(f"Error extracting keywords: {e}")
-            return []
 
 
 # Singleton instance

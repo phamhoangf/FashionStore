@@ -331,10 +331,12 @@ def get_all_orders():
 def get_order(id):
     try:
         order = OrderService.get_order_by_id(id)
+        if not order:
+            return jsonify({"error": f"Không tìm thấy đơn hàng ID: {id}"}), 404
         return jsonify(order.to_dict(include_items=True)), 200
     except Exception as e:
         current_app.logger.error(f"Error getting order {id}: {e}")
-        return jsonify({"error": str(e)}), 404
+        return jsonify({"error": f"Không thể tải thông tin đơn hàng: {str(e)}"}), 404
 
 @bp.route('/orders/<int:id>/status', methods=['PUT'])
 @jwt_required()
@@ -346,10 +348,18 @@ def update_order_status(id):
         return jsonify({"error": "Trạng thái đơn hàng là bắt buộc"}), 400
     
     try:
+        current_app.logger.info(f"Updating order {id} status to: {data['status']}")
         order = OrderService.update_order_status(id, data['status'])
-        return jsonify(order.to_dict()), 200
-    except Exception as e:
+        current_app.logger.info(f"Successfully updated order {id}")
+        return jsonify(order.to_dict(include_items=True)), 200
+    except ValueError as e:
+        current_app.logger.error(f"Value error updating order {id} status: {str(e)}")
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error updating order {id} status: {str(e)}")
+        import traceback
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({"error": "Lỗi server khi cập nhật trạng thái đơn hàng"}), 500
 
 # Thống kê
 @bp.route('/dashboard', methods=['GET'])

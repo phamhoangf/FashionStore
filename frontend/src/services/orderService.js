@@ -26,32 +26,35 @@ export const getUserOrders = async () => {
 };
 
 /**
- * Lấy chi tiết một đơn hàng
- * @param {string|number} orderId - ID của đơn hàng
- * @returns {Promise<Object>} Thông tin chi tiết đơn hàng
+ * Lấy chi tiết đơn hàng theo ID
+ * @param {number|string} id ID của đơn hàng
+ * @returns {Promise<Object>} Thông tin đơn hàng
  */
-export const getOrderDetails = async (orderId) => {
+export const getOrderDetails = async (id) => {
   try {
-    if (!orderId) {
+    if (!id) {
       throw new Error('ID đơn hàng không hợp lệ');
     }
     
-    console.log(`Fetching details for order ID: ${orderId}`);
-    const response = await api.get(`/orders/${orderId}`);
+    console.log(`Requesting order details for ID: ${id}`);
+    const response = await api.get(`/orders/${id}`);
     
-    if (!response) {
-      throw new Error('Không nhận được phản hồi từ máy chủ');
+    // Kiểm tra response
+    if (!response || typeof response !== 'object') {
+      console.error('Invalid order response format:', response);
+      throw new Error('Định dạng phản hồi từ máy chủ không hợp lệ');
     }
-    
-    console.log(`Successfully fetched order ${orderId} details:`, response);
+
+    console.log(`Order details successfully retrieved for ID ${id}:`, response);
     return response;
   } catch (error) {
-    console.error(`Error fetching order details for order ${orderId}:`, error);
+    console.error(`Error fetching order ${id}:`, error);
+    // Ghi log thêm thông tin về lỗi
     if (error.response) {
-      console.error('Error response:', error.response.status, error.response.data);
-      throw error.response.data.error || 'Không thể tải thông tin đơn hàng';
+      console.error('Error response status:', error.response.status);
+      console.error('Error response data:', error.response.data);
     }
-    throw error.message || 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.';
+    throw error;
   }
 };
 

@@ -8,8 +8,8 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
 // Import chatbot components
-import ChatbotButton from './components/ChatbotButton';
-import ChatbotModal from './components/ChatbotModal';
+import ChatbotButton from './components/chatbot/ChatbotButton';
+import ChatbotModal from './components/chatbot/ChatbotModal';
 
 // Lazy load components
 const Layout = React.lazy(() => import('./components/layout/Layout'));

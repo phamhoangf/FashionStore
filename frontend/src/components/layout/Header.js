@@ -221,26 +221,26 @@ const Header = () => {
             {isAuthenticated ? (
               <>
                 <li className="nav-item dropdown">
-                  <a className="nav-link dropdown-toggle d-inline-flex align-items-center" style={{ gap: '6px' }} href="#" role="button" data-bs-toggle="dropdown">
+                  <a className="nav-link dropdown-toggle d-inline-flex align-items-center" style={{ gap: '0px' }} href="#" role="button" data-bs-toggle="dropdown">
                     <i className="bi bi-person-circle"></i>
                     {user?.name || 'Tài khoản'}
                   </a>
                   <ul className="dropdown-menu">
                     <li>
-                      <Link className="dropdown-item d-inline-flex align-items-center" style={{ gap: '5px' }} to="/profile">
+                      <Link className="dropdown-item" to="/profile" style={{ display: 'flex', alignItems: 'center', columnGap: '12px', justifyContent: 'flex-start' }}>
                         <i className="bi bi-person"></i>
                         Hồ sơ
                       </Link>
                     </li>
                     <li>
-                      <Link className="dropdown-item d-inline-flex align-items-center" style={{ gap: '5px' }} to="/orders">
+                      <Link className="dropdown-item" to="/orders" style={{ display: 'flex', alignItems: 'center', columnGap: '12px', justifyContent: 'flex-start' }}>
                         <i className="bi bi-bag"></i>
                         Đơn hàng
                       </Link>
                     </li>
                     {isAdmin() && (
                       <li>
-                        <Link className="dropdown-item d-inline-flex align-items-center" style={{ gap: '5px' }} to="/admin">
+                        <Link className="dropdown-item" to="/admin" style={{ display: 'flex', alignItems: 'center', columnGap: '12px', justifyContent: 'flex-start' }}>
                           <i className="bi bi-gear"></i>
                           Quản trị
                         </Link>
@@ -248,7 +248,7 @@ const Header = () => {
                     )}
                     <li><hr className="dropdown-divider" /></li>
                     <li>
-                      <button className="dropdown-item d-inline-flex align-items-center" style={{ gap: '5px' }} onClick={handleLogout}>
+                      <button className="dropdown-item" style={{ display: 'flex', alignItems: 'center', columnGap: '12px', justifyContent: 'flex-start' }} onClick={handleLogout}>
                         <i className="bi bi-box-arrow-right"></i>
                         Đăng xuất
                       </button>

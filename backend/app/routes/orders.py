@@ -39,24 +39,26 @@ def get_order(id):
         # Lấy thông tin đơn hàng
         order = OrderService.get_order_by_id(id)
         
-        # Kiểm tra quyền truy cập
-        if order.user_id != user_id:
-            try:
-                # Sửa lỗi: Không kiểm tra role mà kiểm tra is_admin
-                user = User.query.get(user_id)
-                if not user:
-                    return jsonify({"error": "Không tìm thấy thông tin người dùng"}), 404
-                
-                if not hasattr(user, 'is_admin') or not user.is_admin:
-                    return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
-            except Exception as access_error:
-                # Log lỗi và trả về thông báo chung về quyền truy cập
-                current_app.logger.error(f"Error checking admin access: {str(access_error)}")
-                return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
+        # Ghi log để debug
+        current_app.logger.debug(f"Order user_id: {order.user_id}, Requesting user_id: {user_id}")
         
-        return jsonify(order.to_dict()), 200
+        # Kiểm tra quyền truy cập - Đảm bảo so sánh an toàn bằng cách chuyển đổi cả hai giá trị thành string
+        if str(order.user_id) != str(user_id):
+            # Kiểm tra xem người dùng hiện tại có phải admin không
+            user = User.query.get(user_id)
+            if not user or not user.is_admin:
+                current_app.logger.warning(f"User {user_id} attempted to access order {id} belonging to user {order.user_id}")
+                return jsonify({"error": "Bạn không có quyền xem đơn hàng này"}), 403
+        
+        # Log thành công
+        current_app.logger.info(f"User {user_id} successfully accessed order {id}")
+        return jsonify(order.to_dict(include_items=True)), 200
+    except ValueError as e:
+        current_app.logger.error(f"Error retrieving order {id}: {str(e)}")
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
-        return jsonify({"error": f"Không thể tải thông tin đơn hàng: {str(e)}"}), 404
+        current_app.logger.error(f"Unexpected error retrieving order {id}: {str(e)}")
+        return jsonify({"error": f"Không thể tải thông tin đơn hàng: {str(e)}"}), 500
 
 @bp.route('', methods=['POST'])
 @jwt_required()
@@ -141,23 +143,33 @@ def create_order():
 def cancel_order(id):
     user_id = get_jwt_identity()
     
-    # Lấy thông tin đơn hàng
-    order = OrderService.get_order_by_id(id)
-    
-    # Kiểm tra quyền truy cập
-    if order.user_id != user_id:
-        return jsonify({"error": "Không có quyền hủy đơn hàng này"}), 403
-    
-    # Kiểm tra trạng thái đơn hàng
-    if order.status != OrderStatus.PENDING.value:
-        return jsonify({"error": "Chỉ có thể hủy đơn hàng đang chờ xử lý"}), 400
-    
     try:
+        # Lấy thông tin đơn hàng
+        order = OrderService.get_order_by_id(id)
+        
+        # Ghi log để debug
+        current_app.logger.debug(f"Cancel order - Order user_id: {order.user_id}, Requesting user_id: {user_id}")
+        
+        # Kiểm tra quyền truy cập - Đảm bảo so sánh an toàn
+        if str(order.user_id) != str(user_id):
+            current_app.logger.warning(f"User {user_id} attempted to cancel order {id} belonging to user {order.user_id}")
+            return jsonify({"error": "Không có quyền hủy đơn hàng này"}), 403
+        
+        # Kiểm tra trạng thái đơn hàng
+        if order.status != OrderStatus.PENDING.value:
+            current_app.logger.warning(f"User {user_id} attempted to cancel non-pending order {id}, status: {order.status}")
+            return jsonify({"error": "Chỉ có thể hủy đơn hàng đang chờ xử lý"}), 400
+        
         # Cập nhật trạng thái đơn hàng
         order = OrderService.update_order_status(id, OrderStatus.CANCELLED.value)
-        return jsonify(order.to_dict()), 200
+        current_app.logger.info(f"Order {id} cancelled successfully by user {user_id}")
+        return jsonify(order.to_dict(include_items=True)), 200
+    except ValueError as e:
+        current_app.logger.error(f"Error cancelling order {id}: {str(e)}")
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        current_app.logger.error(f"Unexpected error cancelling order {id}: {str(e)}")
+        return jsonify({"error": f"Không thể hủy đơn hàng: {str(e)}"}), 500
 
 @bp.route('/admin', methods=['GET'])
 @jwt_required()
@@ -196,6 +208,9 @@ def admin_update_order_status(id):
     try:
         # Cập nhật trạng thái đơn hàng
         order = OrderService.update_order_status(id, data['status'])
-        return jsonify(order.to_dict()), 200
-    except Exception as e:
+        return jsonify(order.to_dict(include_items=True)), 200
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error updating order {id} status: {e}")
+        return jsonify({"error": "Lỗi server khi cập nhật trạng thái đơn hàng"}), 500

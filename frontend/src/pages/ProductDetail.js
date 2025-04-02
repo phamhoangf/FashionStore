@@ -19,20 +19,14 @@ const ProductDetail = () => {
         const productData = await getProduct(id);
         setProduct(productData);
 
-        // Fetch products from the same category
+        // Fetch similar products from the same category
         if (productData.category_id) {
-          const response = await getProducts({
+          const similarProductsData = await getProducts({
             category: productData.category_id,
-            limit: 20 // Lấy nhiều sản phẩm để random
+            limit: 4,
+            exclude: id
           });
-          
-          // Lọc bỏ sản phẩm hiện tại và random 6 sản phẩm
-          const otherProducts = response.items.filter(p => p.id !== parseInt(id));
-          const randomProducts = otherProducts
-            .sort(() => 0.5 - Math.random()) // Shuffle array
-            .slice(0, 6); // Lấy 6 sản phẩm đầu tiên
-          
-          setSimilarProducts(randomProducts);
+          setSimilarProducts(similarProductsData.items);
         }
       } catch (error) {
         console.error('Error fetching product:', error);
@@ -187,41 +181,37 @@ const ProductDetail = () => {
       </div>
 
       {/* Similar Products */}
-      <section className="mt-5">
-        <h2 className="mb-4">Sản phẩm tương tự</h2>
-        <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">
-          {similarProducts.map(product => (
-            <div key={product.id} className="col">
-              <div className="card h-100 border-0 shadow-sm">
-                <Link to={`/product/${product.id}`}>
-                  <img 
-                    src={product.image_url} 
-                    alt={product.name}
-                    className="card-img-top"
-                    style={{ height: '280px', objectFit: 'cover' }}
-                  />
-                </Link>
-                <div className="card-body text-center">
-                  <h5 className="card-title" style={{ fontSize: '1rem', minHeight: '3rem' }}>
-                    <Link to={`/product/${product.id}`} className="text-decoration-none text-dark">
-                      {product.name}
-                    </Link>
-                  </h5>
-                  <p className="card-text text-primary fw-bold">
-                    {product.price.toLocaleString('vi-VN')} VND
-                  </p>
-                  <Link 
-                    to={`/product/${product.id}`} 
-                    className="btn btn-outline-primary"
-                  >
-                    Xem chi tiết
+      {similarProducts.length > 0 && (
+        <section className="mt-5">
+          <h2 className="mb-4">Sản phẩm tương tự</h2>
+          <div className="row">
+            {similarProducts.map(product => (
+              <div key={product.id} className="col-md-3 mb-4">
+                <div className="card h-100">
+                  <Link to={`/product/${product.id}`}>
+                    <img 
+                      src={product.image_url} 
+                      alt={product.name}
+                      className="card-img-top"
+                      style={{ height: '200px', objectFit: 'cover' }}
+                    />
                   </Link>
+                  <div className="card-body">
+                    <h5 className="card-title">
+                      <Link to={`/product/${product.id}`} className="text-decoration-none text-dark">
+                        {product.name}
+                      </Link>
+                    </h5>
+                    <p className="card-text text-primary">
+                      {product.price.toLocaleString('vi-VN')} VND
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 };

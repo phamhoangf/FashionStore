@@ -94,7 +94,7 @@ const Footer = () => {
 
         {/* Copyright */}
         <div className="text-center">
-          <p className="mb-0">© 2024 Shopu. Tất cả các quyền được bảo lưu.</p>
+          <p className="mb-0">© 2025 Shopu. Tất cả các quyền được bảo lưu.</p>
         </div>
       </div>
     </footer>

@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import { login, register, logout, checkAuthStatus } from '../services/authService';
 
 export const AuthContext = createContext();
@@ -101,11 +101,22 @@ export const AuthProvider = ({ children }) => {
 
   const logoutUser = async () => {
     try {
+      // Notify any component that needs to clear data on logout
+      window.dispatchEvent(new CustomEvent('user-logout'));
+      
+      // Perform logout API call
       await logout();
+      
+      // Clear user data
       setUser(null);
+      
+      // Delete all auth tokens
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
     } catch (error) {
       console.error('Logout failed in context:', error);
       setUser(null);
+      localStorage.removeItem('token');
     }
   };
 
