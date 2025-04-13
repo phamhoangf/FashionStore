@@ -1,8 +1,9 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { getCart, addToCart, updateCartItem, removeFromCart, clearCart as clearCartAPI } from '../services/cartService';
+import React, { createContext, useState, useEffect, useCallback, useContext } from 'react';
+import { getCart, addToCart, updateCartItem, removeFromCart, clearCart as clearCartAPI, updateCartItemSize } from '../services/cartService';
 import { getProductById } from '../services/productService';
 import { AuthContext } from './AuthContext';
 import NotificationModal from '../components/common/NotificationModal';
+import { toast } from 'react-toastify';
 
 export const CartContext = createContext();
 
@@ -48,6 +49,15 @@ export const CartProvider = ({ children }) => {
       show: false
     }));
   };
+
+  // Tính tổng tiền cho các mặt hàng đã chọn
+  const calculateSelectedTotal = useCallback((selectedItems) => {
+    if (!cart.items || !selectedItems || selectedItems.length === 0) return 0;
+    
+    return cart.items
+      .filter(item => selectedItems.includes(item.id))
+      .reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0);
+  }, [cart.items]);
 
   // Khởi tạo giỏ hàng từ localStorage hoặc API
   useEffect(() => {
@@ -157,466 +167,439 @@ export const CartProvider = ({ children }) => {
     };
   }, []);
 
-  const addItem = async (productId, quantity) => {
+  const addItem = useCallback(async (productId, quantity, size = '') => {
+    if (!isAuthenticated) {
+      toast.error('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng');
+      return Promise.reject(new Error('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng'));
+    }
+
     try {
-      let product = null;
+      // Start with optimistic UI update
+      const existingItemIndex = cart.items.findIndex(
+        item => item.product_id === parseInt(productId) && item.size === size
+      );
       
-      // Get product details first
+      // Only set loading for new items, not for updating quantity
+      if (existingItemIndex === -1) {
+        // For new items, we'll show loading state
+        setLoading(true);
+      }
+      
+      console.log(`Thêm sản phẩm: productId=${productId}, quantity=${quantity}, size=${size}`);
+      
+      // Kiểm tra tham số đầu vào
+      if (!productId) {
+        const error = new Error('Mã sản phẩm không hợp lệ');
+        toast.error('Không thể thêm sản phẩm: Mã sản phẩm không hợp lệ');
+        if (existingItemIndex === -1) setLoading(false);
+        return Promise.reject(error);
+      }
+      
+      if (isNaN(quantity) || quantity < 1) {
+        const error = new Error('Số lượng sản phẩm không hợp lệ');
+        toast.error('Không thể thêm sản phẩm: Số lượng không hợp lệ');
+        if (existingItemIndex === -1) setLoading(false);
+        return Promise.reject(error);
+      }
+      
+      if (!size) {
+        const error = new Error('Vui lòng chọn kích thước');
+        toast.error('Vui lòng chọn kích thước');
+        if (existingItemIndex === -1) setLoading(false);
+        return Promise.reject(error);
+      }
+
+      // Apply optimistic update for better UX
+      if (existingItemIndex !== -1) {
+        // Update immediately in UI for existing items
+        const existingItem = cart.items[existingItemIndex];
+        const newQuantity = existingItem.quantity + quantity;
+        
+        // Create optimistic update
+        const optimisticItems = [...cart.items];
+        optimisticItems[existingItemIndex] = {
+          ...existingItem,
+          quantity: newQuantity
+        };
+        
+        // Update UI immediately
+        setCart(prevCart => ({
+          ...prevCart,
+          items: optimisticItems,
+          total: optimisticItems.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0),
+          total_items: optimisticItems.reduce((sum, item) => sum + item.quantity, 0)
+        }));
+        
+        // Then make API call in background
+        updateCartItem(existingItem.id, newQuantity)
+          .then(response => {
+            // If API response is different from our optimistic update, correct it
+            if (response && response.items) {
+              setCart(prevCart => ({
+                ...prevCart,
+                items: response.items,
+                total: response.total || 0,
+                total_items: response.total_items || 0
+              }));
+            }
+          })
+          .catch(err => {
+            console.error('Error updating cart item:', err);
+            toast.error('Không thể cập nhật sản phẩm, vui lòng thử lại');
+            
+            // Revert to original state on error
+            setCart(prevCart => ({
+              ...prevCart,
+              items: cart.items, // Original items before optimistic update
+              total: cart.total,
+              total_items: cart.total_items
+            }));
+          });
+        
+        return Promise.resolve({ success: true });
+      } else {
+        // For new items, make API call first since we need the new item ID
+        const response = await addToCart(productId, quantity, size);
+        
+        console.log('Add to cart response:', response);
+        
+        // Cập nhật giỏ hàng
+        if (response && response.items) {
+          console.log('Updating cart with new items:', response.items);
+          
+          setCart(prevCart => ({
+            ...prevCart,
+            items: response.items,
+            total: response.total || 0,
+            total_items: response.total_items || 0
+          }));
+          
+          return Promise.resolve({ success: true });
+        } else {
+          console.error('Invalid response format:', response);
+          toast.error('Không thể cập nhật giỏ hàng. Vui lòng thử lại sau');
+          return Promise.reject(new Error('Invalid response format'));
+        }
+      }
+    } catch (err) {
+      console.error('Error adding item to cart:', err);
+      
+      // Hiển thị thông báo lỗi chi tiết hơn
+      let errorMessage = 'Không thể thêm sản phẩm vào giỏ hàng';
+      
+      if (err.response && err.response.data && err.response.data.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      toast.error(errorMessage);
+      return Promise.reject(new Error(errorMessage));
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated, cart, updateCartItem]);
+
+  const updateItem = useCallback(async (itemId, quantity) => {
+    if (!isAuthenticated || quantity < 1) return;
+
+    try {
+      // Apply optimistic update first for immediate UI feedback
+      const itemIndex = cart.items.findIndex(item => item.id === itemId);
+      
+      if (itemIndex !== -1) {
+        // Create a copy of the current items
+        const optimisticItems = [...cart.items];
+        const currentItem = optimisticItems[itemIndex];
+        
+        // Update the item quantity in our copy
+        optimisticItems[itemIndex] = {
+          ...currentItem,
+          quantity: quantity
+        };
+        
+        // Immediately update the UI with optimistic data
+        setCart(prevCart => ({
+          ...prevCart,
+          items: optimisticItems,
+          total: optimisticItems.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0),
+          total_items: optimisticItems.reduce((sum, item) => sum + item.quantity, 0)
+        }));
+        
+        // Then perform API call in background without blocking UI
+        updateCartItem(itemId, quantity)
+          .then(response => {
+            // If API response is different from our optimistic update, correct the state
+            if (response && response.items) {
+              setCart(prevCart => ({
+                ...prevCart,
+                items: response.items,
+                total: response.total || 0,
+                total_items: response.total_items || 0
+              }));
+            }
+          })
+          .catch(err => {
+            console.error('Error updating cart item:', err);
+            toast.error('Không thể cập nhật sản phẩm');
+            
+            // Revert optimistic update on error
+            setCart(prevCart => ({
+              ...prevCart,
+              items: cart.items, // Original items before optimistic update
+              total: cart.total,
+              total_items: cart.total_items
+            }));
+          });
+      } else {
+        // Item not found in local cart, force API call and wait for response
+        setLoading(true);
+        const response = await updateCartItem(itemId, quantity);
+        
+        if (response && response.items) {
+          setCart(prevCart => ({
+            ...prevCart,
+            items: response.items,
+            total: response.total || 0,
+            total_items: response.total_items || 0
+          }));
+        }
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Error updating cart item:', err);
+      toast.error('Không thể cập nhật sản phẩm');
+    }
+  }, [isAuthenticated, cart]);
+
+  // Cập nhật kích thước của sản phẩm trong giỏ hàng
+  const updateItemSize = useCallback(async (itemId, newSize) => {
+    if (!isAuthenticated) return;
+
+    try {
+      // Apply optimistic update first
+      const itemIndex = cart.items.findIndex(item => item.id === itemId);
+      
+      if (itemIndex !== -1) {
+        // Create a copy of the current items
+        const optimisticItems = [...cart.items];
+        const currentItem = optimisticItems[itemIndex];
+        
+        // Update the item size in our copy
+        optimisticItems[itemIndex] = {
+          ...currentItem,
+          size: newSize
+        };
+        
+        // Immediately update the UI with optimistic data
+        setCart(prevCart => ({
+          ...prevCart,
+          items: optimisticItems
+        }));
+        
+        // Call API to update the size
+        const response = await updateCartItemSize(itemId, newSize);
+        
+        if (response && response.items) {
+          // Update cart with the response from API
+          setCart(prevCart => ({
+            ...prevCart,
+            items: response.items,
+            total: response.total || 0,
+            total_items: response.total_items || 0
+          }));
+          
+          toast.success('Đã cập nhật kích thước sản phẩm');
+        }
+      } else {
+        toast.error('Không tìm thấy sản phẩm để cập nhật');
+      }
+    } catch (err) {
+      console.error('Error updating item size:', err);
+      toast.error('Không thể cập nhật kích thước sản phẩm');
+      
+      // Reload cart to reset to server state
       try {
-        product = await getProductById(productId);
-      } catch (error) {
-        console.error('Failed to get product details:', error);
+        const cartData = await getCart();
+        if (cartData && cartData.items) {
+          setCart(cartData);
+        }
+      } catch (reloadErr) {
+        console.error('Error reloading cart after update failure:', reloadErr);
       }
-      
-      // Nếu đã đăng nhập, thêm vào giỏ hàng qua API
-      if (isAuthenticated) {
-        try {
-          const updatedCart = await addToCart(productId, quantity);
-          setCart(updatedCart);
-          
-          // Show notification
-          if (product) {
-            showNotification(
-              'Thêm vào giỏ hàng thành công',
-              `Đã thêm ${quantity} sản phẩm vào giỏ hàng.`,
-              product
-            );
-          }
-          
-          return updatedCart;
-        } catch (error) {
-          console.error('Failed to add item to cart via API:', error);
-          // Nếu API lỗi, thêm vào giỏ hàng local
-          await addItemToLocalCart(productId, quantity);
-          
-          // Still show notification even if API fails
-          if (product) {
-            showNotification(
-              'Thêm vào giỏ hàng thành công',
-              `Đã thêm ${quantity} sản phẩm vào giỏ hàng.`,
-              product
-            );
-          }
-          
-          return cart;
-        }
-      } else {
-        // Nếu chưa đăng nhập, lưu vào giỏ hàng tạm thời
-        await addItemToTempCart(productId, quantity);
-        
-        // Show notification
-        if (product) {
-          showNotification(
-            'Thêm vào giỏ hàng thành công',
-            `Đã thêm ${quantity} sản phẩm vào giỏ hàng.`,
-            product
-          );
-        }
-        
-        return tempCart;
-      }
-    } catch (error) {
-      console.error('Failed to add item to cart:', error);
-      return false;
     }
-  };
+  }, [isAuthenticated, cart]);
 
-  // Hàm thêm sản phẩm vào giỏ hàng tạm thời
-  const addItemToTempCart = async (productId, quantity) => {
+  const removeItem = useCallback(async (itemId) => {
+    if (!isAuthenticated) return;
+
     try {
-      // Lấy thông tin sản phẩm từ API
-      const product = await getProductById(productId);
+      // Apply optimistic update for immediate UI feedback
+      const itemToRemove = cart.items.find(item => item.id === itemId);
       
-      setTempCart(prevCart => {
-        // Nếu chưa có giỏ hàng tạm thời, tạo mới
-        if (!prevCart) {
-          prevCart = { items: [], total: 0, total_items: 0 };
-        }
+      if (itemToRemove) {
+        // Store original cart state for potential rollback
+        const originalItems = [...cart.items];
         
-        // Tìm sản phẩm trong giỏ hàng
-        const existingItemIndex = prevCart.items.findIndex(item => item.product_id === productId);
-        
-        if (existingItemIndex >= 0) {
-          // Nếu sản phẩm đã có trong giỏ hàng, cập nhật số lượng
-          const updatedItems = [...prevCart.items];
-          updatedItems[existingItemIndex].quantity += quantity;
-          
-          // Tính lại tổng tiền
-          const total = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-          const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return {
-            ...prevCart,
-            items: updatedItems,
-            total,
-            total_items: totalItems
-          };
-        } else {
-          // Nếu sản phẩm chưa có trong giỏ hàng, thêm mới
-          const newItem = {
-            id: Date.now(), // ID tạm thời
-            product_id: productId,
-            quantity,
-            product
-          };
-          
-          const updatedItems = [...prevCart.items, newItem];
-          const total = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-          const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return {
-            ...prevCart,
-            items: updatedItems,
-            total,
-            total_items: totalItems
-          };
-        }
-      });
-    } catch (error) {
-      console.error('Failed to get product details:', error);
-      // Nếu không lấy được thông tin sản phẩm, vẫn thêm vào giỏ hàng với thông tin tối thiểu
-      setTempCart(prevCart => {
-        // Nếu chưa có giỏ hàng tạm thời, tạo mới
-        if (!prevCart) {
-          prevCart = { items: [], total: 0, total_items: 0 };
-        }
-        
-        const existingItemIndex = prevCart.items.findIndex(item => item.product_id === productId);
-        
-        if (existingItemIndex >= 0) {
-          const updatedItems = [...prevCart.items];
-          updatedItems[existingItemIndex].quantity += quantity;
-          
-          const total = updatedItems.reduce((sum, item) => sum + ((item.product?.price || 0) * item.quantity), 0);
-          const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return {
-            ...prevCart,
-            items: updatedItems,
-            total,
-            total_items: totalItems
-          };
-        } else {
-          const newItem = {
-            id: Date.now(),
-            product_id: productId,
-            quantity,
-            product: {
-              id: productId,
-              name: `Sản phẩm #${productId}`,
-              price: 0,
-              image_url: ''
-            }
-          };
-          
-          const updatedItems = [...prevCart.items, newItem];
-          const total = updatedItems.reduce((sum, item) => sum + ((item.product?.price || 0) * item.quantity), 0);
-          const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return {
-            ...prevCart,
-            items: updatedItems,
-            total,
-            total_items: totalItems
-          };
-        }
-      });
-    }
-  };
-
-  // Hàm thêm sản phẩm vào giỏ hàng local
-  const addItemToLocalCart = async (productId, quantity) => {
-    try {
-      // Lấy thông tin sản phẩm từ API
-      const product = await getProductById(productId);
-      
-      setCart(prevCart => {
-        // Tìm sản phẩm trong giỏ hàng
-        const existingItemIndex = prevCart.items.findIndex(item => item.product_id === productId);
-        
-        if (existingItemIndex >= 0) {
-          // Nếu sản phẩm đã có trong giỏ hàng, cập nhật số lượng
-          const updatedItems = [...prevCart.items];
-          updatedItems[existingItemIndex].quantity += quantity;
-          
-          // Tính lại tổng tiền
-          const total = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-          const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return {
-            ...prevCart,
-            items: updatedItems,
-            total,
-            total_items: totalItems
-          };
-        } else {
-          // Nếu sản phẩm chưa có trong giỏ hàng, thêm mới
-          const newItem = {
-            id: Date.now(), // ID tạm thời
-            product_id: productId,
-            quantity,
-            product
-          };
-          
-          const updatedItems = [...prevCart.items, newItem];
-          const total = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-          const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return {
-            ...prevCart,
-            items: updatedItems,
-            total,
-            total_items: totalItems
-          };
-        }
-      });
-    } catch (error) {
-      console.error('Failed to get product details:', error);
-      // Nếu không lấy được thông tin sản phẩm, vẫn thêm vào giỏ hàng với thông tin tối thiểu
-      setCart(prevCart => {
-        const existingItemIndex = prevCart.items.findIndex(item => item.product_id === productId);
-        
-        if (existingItemIndex >= 0) {
-          const updatedItems = [...prevCart.items];
-          updatedItems[existingItemIndex].quantity += quantity;
-          
-          const total = updatedItems.reduce((sum, item) => sum + ((item.product?.price || 0) * item.quantity), 0);
-          const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return {
-            ...prevCart,
-            items: updatedItems,
-            total,
-            total_items: totalItems
-          };
-        } else {
-          const newItem = {
-            id: Date.now(),
-            product_id: productId,
-            quantity,
-            product: {
-              id: productId,
-              name: `Sản phẩm #${productId}`,
-              price: 0,
-              image_url: ''
-            }
-          };
-          
-          const updatedItems = [...prevCart.items, newItem];
-          const total = updatedItems.reduce((sum, item) => sum + ((item.product?.price || 0) * item.quantity), 0);
-          const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return {
-            ...prevCart,
-            items: updatedItems,
-            total,
-            total_items: totalItems
-          };
-        }
-      });
-    }
-  };
-
-  const updateItem = async (itemId, quantity) => {
-    try {
-      // Nếu đã đăng nhập, cập nhật giỏ hàng qua API
-      if (isAuthenticated) {
-        try {
-          const updatedCart = await updateCartItem(itemId, quantity);
-          setCart(updatedCart);
-          return updatedCart;
-        } catch (error) {
-          console.error('Failed to update cart item via API:', error);
-          // Nếu API lỗi, cập nhật giỏ hàng local
-          updateLocalCartItem(itemId, quantity);
-          return cart;
-        }
-      } else {
-        // Nếu chưa đăng nhập, cập nhật giỏ hàng tạm thời
-        updateTempCartItem(itemId, quantity);
-        return tempCart;
-      }
-    } catch (error) {
-      console.error('Failed to update cart item:', error);
-      return false;
-    }
-  };
-
-  // Hàm cập nhật sản phẩm trong giỏ hàng tạm thời
-  const updateTempCartItem = (itemId, quantity) => {
-    setTempCart(prevCart => {
-      if (!prevCart) return prevCart;
-      
-      // Tìm sản phẩm trong giỏ hàng
-      const existingItemIndex = prevCart.items.findIndex(item => item.id === itemId);
-      
-      if (existingItemIndex >= 0) {
-        // Cập nhật số lượng
-        const updatedItems = [...prevCart.items];
-        updatedItems[existingItemIndex].quantity = quantity;
-        
-        // Tính lại tổng tiền
-        const total = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-        const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-        
-        return {
+        // Update UI immediately with the item removed
+        const updatedItems = cart.items.filter(item => item.id !== itemId);
+        setCart(prevCart => ({
           ...prevCart,
           items: updatedItems,
-          total,
-          total_items: totalItems
-        };
-      }
-      
-      return prevCart;
-    });
-  };
-
-  // Hàm cập nhật sản phẩm trong giỏ hàng local
-  const updateLocalCartItem = (itemId, quantity) => {
-    setCart(prevCart => {
-      // Tìm sản phẩm trong giỏ hàng
-      const existingItemIndex = prevCart.items.findIndex(item => item.id === itemId);
-      
-      if (existingItemIndex >= 0) {
-        // Cập nhật số lượng
-        const updatedItems = [...prevCart.items];
-        updatedItems[existingItemIndex].quantity = quantity;
+          total: updatedItems.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0),
+          total_items: updatedItems.reduce((sum, item) => sum + item.quantity, 0)
+        }));
         
-        // Tính lại tổng tiền
-        const total = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-        const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
+        // Show immediate feedback
+        toast.info('Đang xóa sản phẩm khỏi giỏ hàng...');
         
-        return {
-          ...prevCart,
-          items: updatedItems,
-          total,
-          total_items: totalItems
-        };
-      }
-      
-      return prevCart;
-    });
-  };
-
-  const removeItem = async (itemId) => {
-    try {
-      // Nếu đã đăng nhập, xóa sản phẩm khỏi giỏ hàng qua API
-      if (isAuthenticated) {
-        try {
-          const updatedCart = await removeFromCart(itemId);
-          setCart(updatedCart);
-          return updatedCart;
-        } catch (error) {
-          console.error('Failed to remove item from cart via API:', error);
-          // Nếu API lỗi, xóa sản phẩm khỏi giỏ hàng local
-          removeLocalCartItem(itemId);
-          return cart;
-        }
+        // Then perform API call in background
+        removeFromCart(itemId)
+          .then(response => {
+            // If API response is different from our optimistic update, correct it
+            if (response && response.items) {
+              setCart(prevCart => ({
+                ...prevCart,
+                items: response.items,
+                total: response.total || 0,
+                total_items: response.total_items || 0
+              }));
+            }
+            
+            // Show success message after API call completes
+            toast.success('Đã xóa sản phẩm khỏi giỏ hàng');
+          })
+          .catch(err => {
+            console.error('Error removing item from cart:', err);
+            toast.error('Không thể xóa sản phẩm, vui lòng thử lại');
+            
+            // Revert optimistic update on error
+            setCart(prevCart => ({
+              ...prevCart,
+              items: originalItems,
+              total: originalItems.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0),
+              total_items: originalItems.reduce((sum, item) => sum + item.quantity, 0)
+            }));
+          });
       } else {
-        // Nếu chưa đăng nhập, xóa sản phẩm khỏi giỏ hàng tạm thời
-        removeTempCartItem(itemId);
-        return tempCart;
+        // Item not found in local cart, show error
+        toast.error('Không tìm thấy sản phẩm để xóa');
       }
-    } catch (error) {
-      console.error('Failed to remove item from cart:', error);
-      return false;
+    } catch (err) {
+      console.error('Error removing item from cart:', err);
+      toast.error('Không thể xóa sản phẩm');
     }
-  };
+  }, [isAuthenticated, cart.items]);
 
-  // Hàm xóa sản phẩm khỏi giỏ hàng tạm thời
-  const removeTempCartItem = (itemId) => {
-    setTempCart(prevCart => {
-      if (!prevCart) return prevCart;
-      
-      // Lọc bỏ sản phẩm cần xóa
-      const updatedItems = prevCart.items.filter(item => item.id !== itemId);
-      
-      // Tính lại tổng tiền
-      const total = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-      const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-      
-      return {
-        ...prevCart,
-        items: updatedItems,
-        total,
-        total_items: totalItems
-      };
-    });
-  };
+  // Xóa những sản phẩm đã chọn khỏi giỏ hàng (sau khi thanh toán)
+  const removeSelectedItems = useCallback(async (itemIds, silent = false) => {
+    if (!isAuthenticated || !itemIds || itemIds.length === 0) return;
 
-  // Hàm xóa sản phẩm khỏi giỏ hàng local
-  const removeLocalCartItem = (itemId) => {
-    setCart(prevCart => {
-      // Lọc bỏ sản phẩm cần xóa
-      const updatedItems = prevCart.items.filter(item => item.id !== itemId);
-      
-      // Tính lại tổng tiền
-      const total = updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-      const totalItems = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-      
-      return {
-        ...prevCart,
-        items: updatedItems,
-        total,
-        total_items: totalItems
-      };
-    });
-  };
-
-  // Hàm xóa toàn bộ giỏ hàng
-  const clearCart = async (forceReload = false) => {
     try {
-      console.log('Clearing cart, before clear - itemCount:', itemCount);
+      // Chuyển đổi tất cả IDs sang chuỗi để so sánh nhất quán
+      const stringItemIds = itemIds.map(id => String(id));
       
-      if (isAuthenticated) {
-        // Nếu đã đăng nhập, xóa giỏ hàng qua API
-        await clearCartAPI();
-      }
+      // Lưu lại danh sách các sản phẩm trước khi xóa để có thể khôi phục nếu có lỗi
+      const originalItems = [...cart.items];
       
-      // Xóa giỏ hàng trong state - đảm bảo cập nhật đúng cấu trúc
-      setCart({ 
-        items: [], 
-        total: 0, 
-        total_items: 0 
+      // Tách riêng các sản phẩm cần xóa và các sản phẩm cần giữ lại
+      const itemsToRemove = cart.items.filter(item => stringItemIds.includes(String(item.id)));
+      const itemsToKeep = cart.items.filter(item => !stringItemIds.includes(String(item.id)));
+      
+      // Ghi log để debug
+      console.log(`Removing ${itemsToRemove.length} items, keeping ${itemsToKeep.length} items`);
+      
+      // Đếm chính xác số lượng sản phẩm còn lại
+      const newTotalItems = itemsToKeep.reduce((sum, item) => sum + item.quantity, 0);
+      console.log(`New total items count: ${newTotalItems}`);
+      
+      // Gọi API để xóa từng sản phẩm đã chọn
+      const removePromises = itemsToRemove.map(item => 
+        removeFromCart(item.id).catch(error => {
+          console.error(`Lỗi khi xóa sản phẩm ${item.id}:`, error);
+          return null;
+        })
+      );
+      
+      // Chờ tất cả các API call hoàn thành
+      await Promise.all(removePromises);
+      
+      // Sau khi xóa trên server, cập nhật state với thông tin chính xác
+      setCart({
+        items: itemsToKeep,
+        total: itemsToKeep.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0),
+        total_items: newTotalItems
       });
       
-      // Force immediate state update for cart count in header
-      // This is a direct DOM update as a fallback to ensure UI consistency
+      // Lưu vào localStorage để đồng bộ
+      localStorage.setItem('cart', JSON.stringify({
+        items: itemsToKeep,
+        total: itemsToKeep.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0),
+        total_items: newTotalItems
+      }));
+      
+      // Phát một event để cập nhật badge số lượng giỏ hàng
+      window.dispatchEvent(new CustomEvent('cart-updated', { 
+        detail: { count: newTotalItems } 
+      }));
+      
+      // Thông báo thành công nếu không ở chế độ im lặng
+      if (!silent) {
+        toast.success('Đã xóa sản phẩm đã mua khỏi giỏ hàng');
+      }
+      
+    } catch (err) {
+      console.error('Error removing selected items from cart:', err);
+      
+      // Chỉ hiển thị thông báo lỗi nếu không ở chế độ im lặng
+      if (!silent) {
+        toast.error('Không thể xóa sản phẩm đã chọn, vui lòng thử lại');
+      }
+      
+      // Tải lại giỏ hàng để đồng bộ với server
       try {
-        const cartBadges = document.querySelectorAll('.position-absolute.badge');
-        cartBadges.forEach(badge => {
-          if (badge.parentElement?.textContent.includes('Giỏ hàng')) {
-            badge.style.display = 'none';
-          }
-        });
-      } catch (domError) {
-        console.error('DOM update failed:', domError);
+        const cartData = await getCart();
+        if (cartData && cartData.items) {
+          setCart(cartData);
+          
+          // Cập nhật badge giỏ hàng
+          const newCount = cartData.total_items || 0;
+          window.dispatchEvent(new CustomEvent('cart-updated', { 
+            detail: { count: newCount } 
+          }));
+        }
+      } catch (reloadErr) {
+        console.error('Error reloading cart after removal failure:', reloadErr);
       }
-      
-      // Cập nhật giỏ hàng tạm thời nếu có
-      if (tempCart) {
-        setTempCart(null);
-      }
-      
-      // Xóa giỏ hàng trong localStorage
-      localStorage.removeItem('cart');
-      localStorage.removeItem('tempCart');
-      
-      // Nếu cần tải lại trang để đồng bộ trạng thái
-      if (forceReload) {
-        console.log('Force reload requested for cart clear');
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      }
-      
-      console.log('Cart has been cleared completely, new itemCount should be 0');
-      return true;
-    } catch (error) {
-      console.error('Failed to clear cart:', error);
-      return false;
     }
-  };
+  }, [isAuthenticated, cart, removeFromCart, getCart]);
+
+  const clearCartItems = useCallback(async (silent = false) => {
+    if (!isAuthenticated) return;
+
+    try {
+      setLoading(true);
+      await clearCartAPI();
+      
+      // Reset state
+      setCart({ items: [], total: 0, total_items: 0 });
+      
+      // Only show notification if not in silent mode
+      if (!silent) {
+        toast.info('Đã xóa toàn bộ giỏ hàng');
+      }
+      
+    } catch (err) {
+      console.error('Error clearing cart:', err);
+      // Only show error notification if not silent
+      if (!silent) {
+        toast.error('Không thể xóa giỏ hàng');
+      }
+      
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated]);
 
   return (
     <CartContext.Provider
@@ -627,8 +610,11 @@ export const CartProvider = ({ children }) => {
         loading,
         addItem,
         updateItem,
+        updateItemSize,
         removeItem,
-        clearCart,
+        removeSelectedItems,
+        clearCart: clearCartItems,
+        calculateSelectedTotal,
         showNotification,
         hideNotification
       }}

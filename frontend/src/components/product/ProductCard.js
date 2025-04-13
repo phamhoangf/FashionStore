@@ -1,7 +1,5 @@
-import React, { useContext, useState, useCallback, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { CartContext } from '../../context/CartContext';
-import { AuthContext } from '../../context/AuthContext';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { formatImageUrl } from '../../utils/imageUtils';
 import './ProductCard.css';
 
@@ -9,9 +7,6 @@ import './ProductCard.css';
 const DEFAULT_IMAGE = 'https://via.placeholder.com/300x400?text=No+Image';
 
 const ProductCard = React.memo(({ product }) => {
-  const { addItem } = useContext(CartContext);
-  const { isAuthenticated } = useContext(AuthContext);
-  const navigate = useNavigate();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageSrc, setImageSrc] = useState('');
   
@@ -26,22 +21,6 @@ const ProductCard = React.memo(({ product }) => {
       setImageSrc(formattedUrl);
     }
   }, [product.image_url]);
-  
-  // Xử lý sự kiện thêm vào giỏ hàng
-  const handleAddToCart = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    
-    // Thêm sản phẩm vào giỏ hàng với thông tin đầy đủ
-    addItem(product.id, 1);
-    
-    // Không cần alert nữa vì notification modal đã được xử lý trong CartContext
-  }, [addItem, isAuthenticated, navigate, product.id]);
   
   // Xử lý sự kiện khi ảnh tải xong
   const handleImageLoad = useCallback(() => {
@@ -77,12 +56,9 @@ const ProductCard = React.memo(({ product }) => {
         <h5 className="card-title">{product.name}</h5>
         <p className="card-text text-muted">{product.price.toLocaleString('vi-VN')} VNĐ</p>
         <div className="mt-auto">
-          <Link to={`/products/${product.id}`} className="btn btn-outline-primary btn-sm me-2">
-            Chi tiết
+          <Link to={`/products/${product.id}`} className="btn btn-primary w-100">
+            Xem chi tiết
           </Link>
-          <button className="btn btn-primary btn-sm" onClick={handleAddToCart}>
-            Thêm vào giỏ
-          </button>
         </div>
       </div>
     </div>

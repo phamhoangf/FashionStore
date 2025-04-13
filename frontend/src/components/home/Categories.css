@@ -1,5 +1,6 @@
 .categories-section {
   background-color: #f8f9fa;
+  padding: 60px 0;
 }
 
 .categories-section h2 {
@@ -10,30 +11,33 @@
 .category-card {
   display: block;
   color: inherit;
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
 }
 
-.category-card:hover {
+.category-card-hover {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.category-card-hover:hover {
   transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
 }
 
 .card-img-container {
+  height: 200px;
   overflow: hidden;
   position: relative;
-  padding-top: 125%; /* 4:5 aspect ratio */
 }
 
-.card-img-container img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
+.category-img {
   height: 100%;
+  width: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform 0.5s ease;
 }
 
-.category-card:hover .card-img-container img {
+.category-card:hover .category-img {
   transform: scale(1.05);
 }
 
@@ -46,15 +50,23 @@
   margin-bottom: 0.5rem;
 }
 
-.btn-outline-dark {
+.category-card .btn {
+  transition: all 0.3s ease;
   border-width: 2px;
   font-weight: 500;
-  padding: 0.5rem 1.5rem;
-  transition: all 0.3s ease;
 }
 
-.btn-outline-dark:hover {
-  background-color: #212529;
+.category-card:hover .btn {
+  background-color: var(--bs-primary);
   color: white;
-  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .card-img-container {
+    height: 160px;
+  }
+  
+  .categories-section {
+    padding: 40px 0;
+  }
 } 

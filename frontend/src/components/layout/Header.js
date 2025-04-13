@@ -24,36 +24,109 @@ const Header = () => {
         console.log('Categories from API:', data);
         
         if (!data || data.length === 0) {
-          // If no categories returned, use fallback data
+          // Sử dụng danh mục mặc định nếu API không trả về dữ liệu
           const fallbackCategories = [
-            { id: 1, name: 'Nam', description: 'Thời trang nam' },
-            { id: 2, name: 'Nữ', description: 'Thời trang nữ' },
-            { id: 3, name: 'Trẻ em', description: 'Thời trang trẻ em' },
-            { id: 4, name: 'Phụ kiện', description: 'Phụ kiện thời trang' }
+            { 
+              id: 2, 
+              name: 'Quần nam', 
+              description: 'Quần nam các loại',
+              subcategories: [
+                { id: 5, name: 'Quần short', description: 'Quần short nam' },
+                { id: 6, name: 'Quần jeans', description: 'Quần jeans nam' },
+                { id: 7, name: 'Quần âu', description: 'Quần âu nam' },
+                { id: 8, name: 'Quần kaki', description: 'Quần kaki nam dài' }
+              ]
+            },
+            { 
+              id: 3, 
+              name: 'Áo nam', 
+              description: 'Áo nam các loại',
+              subcategories: [
+                { id: 9, name: 'Áo thun', description: 'Áo thun nam' },
+                { id: 10, name: 'Áo polo', description: 'Áo polo nam' },
+                { id: 11, name: 'Áo sơ mi', description: 'Áo sơ mi nam' },
+                { id: 12, name: 'Áo khoác', description: 'Áo khoác nam' },
+                { id: 13, name: 'Áo len', description: 'Áo len nam' }
+              ]
+            }
           ];
           setCategories(fallbackCategories);
           setLoading(false);
           return;
         }
         
-        // Filter root categories (no parent)
-        const rootCategories = data.filter(cat => !cat.parent_id);
-        setCategories(rootCategories);
+        // Tìm danh mục Quần và Áo
+        const mainCategories = data.filter(cat => cat.name === 'Quần' || cat.name === 'Áo');
         
-        // For each root category, find its subcategories
-        rootCategories.forEach(rootCat => {
-          rootCat.subcategories = data.filter(cat => cat.parent_id === rootCat.id);
-        });
+        // Nếu có kết quả, thêm subcategories
+        if (mainCategories.length > 0) {
+          mainCategories.forEach(mainCat => {
+            // Thêm "nam" vào tên danh mục
+            mainCat.name = `${mainCat.name} nam`;
+            
+            // Tìm các danh mục con
+            mainCat.subcategories = data.filter(cat => cat.parent_id === mainCat.id);
+          });
+          
+          setCategories(mainCategories);
+        } else {
+          // Sử dụng danh mục mặc định nếu không tìm thấy
+          const fallbackCategories = [
+            { 
+              id: 2, 
+              name: 'Quần nam', 
+              description: 'Quần nam các loại',
+              subcategories: [
+                { id: 5, name: 'Quần short', description: 'Quần short nam' },
+                { id: 6, name: 'Quần jeans', description: 'Quần jeans nam' },
+                { id: 7, name: 'Quần âu', description: 'Quần âu nam' },
+                { id: 8, name: 'Quần kaki', description: 'Quần kaki nam dài' }
+              ]
+            },
+            { 
+              id: 3, 
+              name: 'Áo nam', 
+              description: 'Áo nam các loại',
+              subcategories: [
+                { id: 9, name: 'Áo thun', description: 'Áo thun nam' },
+                { id: 10, name: 'Áo polo', description: 'Áo polo nam' },
+                { id: 11, name: 'Áo sơ mi', description: 'Áo sơ mi nam' },
+                { id: 12, name: 'Áo khoác', description: 'Áo khoác nam' },
+                { id: 13, name: 'Áo len', description: 'Áo len nam' }
+              ]
+            }
+          ];
+          setCategories(fallbackCategories);
+        }
         
         setLoading(false);
       } catch (error) {
         console.error('Error fetching categories:', error);
-        // Use fallback categories if API fails
+        // Fallback categories
         const fallbackCategories = [
-          { id: 1, name: 'Nam', description: 'Thời trang nam' },
-          { id: 2, name: 'Nữ', description: 'Thời trang nữ' },
-          { id: 3, name: 'Trẻ em', description: 'Thời trang trẻ em' },
-          { id: 4, name: 'Phụ kiện', description: 'Phụ kiện thời trang' }
+          { 
+            id: 2, 
+            name: 'Quần nam', 
+            description: 'Quần nam các loại',
+            subcategories: [
+              { id: 5, name: 'Quần short', description: 'Quần short nam' },
+              { id: 6, name: 'Quần jeans', description: 'Quần jeans nam' },
+              { id: 7, name: 'Quần âu', description: 'Quần âu nam' },
+              { id: 8, name: 'Quần kaki', description: 'Quần kaki nam dài' }
+            ]
+          },
+          { 
+            id: 3, 
+            name: 'Áo nam', 
+            description: 'Áo nam các loại',
+            subcategories: [
+              { id: 9, name: 'Áo thun', description: 'Áo thun nam' },
+              { id: 10, name: 'Áo polo', description: 'Áo polo nam' },
+              { id: 11, name: 'Áo sơ mi', description: 'Áo sơ mi nam' },
+              { id: 12, name: 'Áo khoác', description: 'Áo khoác nam' },
+              { id: 13, name: 'Áo len', description: 'Áo len nam' }
+            ]
+          }
         ];
         setCategories(fallbackCategories);
         setLoading(false);
@@ -73,6 +146,21 @@ const Header = () => {
     }
   }, [itemCount]);
 
+  // Add separate effect for cart-updated event
+  useEffect(() => {
+    const handleCartUpdate = (e) => {
+      console.log('Cart update event received in header with count:', e.detail.count);
+      setDisplayCount(e.detail.count);
+      prevCountRef.current = e.detail.count;
+    };
+
+    window.addEventListener('cart-updated', handleCartUpdate);
+    
+    return () => {
+      window.removeEventListener('cart-updated', handleCartUpdate);
+    };
+  }, []);
+
   // Force header to refresh when route changes
   useEffect(() => {
     // This ensures the cart count is refreshed when navigating between pages
@@ -90,19 +178,10 @@ const Header = () => {
     if (searchTerm.trim()) {
       console.log('Searching for:', searchTerm.trim());
       
-      // Kiểm tra xem đã ở trang sản phẩm chưa
-      const isProductsPage = location.pathname === '/products';
+      // Redirect to search results page
+      navigate(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
       
-      // Nếu đã ở trang sản phẩm, cập nhật URL với tham số tìm kiếm mới
-      // và thêm timestamp để đảm bảo React Router nhận biết sự thay đổi
-      if (isProductsPage) {
-        navigate(`/products?search=${encodeURIComponent(searchTerm.trim())}&timestamp=${Date.now()}`);
-      } else {
-        // Nếu chưa ở trang sản phẩm, chuyển hướng đến trang sản phẩm với tham số tìm kiếm
-        navigate(`/products?search=${encodeURIComponent(searchTerm.trim())}`);
-      }
-      
-      // Xóa trường tìm kiếm sau khi đã tìm
+      // Clear search input after submission
       setSearchTerm('');
     }
   };
@@ -126,12 +205,13 @@ const Header = () => {
     <header className="navbar navbar-expand-lg navbar-light bg-light">
       <div className="container">
         <Link className="navbar-brand d-flex align-items-center" to="/">
-          <img 
+          {/* <img 
             src="/logo.png" 
-            alt="Fashion Store Logo" 
+            alt="MenStyle Logo" 
             height="75" 
             className="me-2"
-          />
+          /> */}
+          <span className="fw-bold text-primary fs-4">MenStyle</span>
         </Link>
         <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
           <span className="navbar-toggler-icon"></span>
@@ -141,7 +221,7 @@ const Header = () => {
             <li className="nav-item">
               <Link className="nav-link d-inline-flex align-items-center" style={{ gap: '3px' }} to="/">
                 <i className="bi bi-house-door"></i>
-                Shopu
+                Trang chủ
               </Link>
             </li>
             

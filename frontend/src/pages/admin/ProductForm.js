@@ -30,10 +30,102 @@ const ProductForm = () => {
     const fetchCategories = async () => {
       try {
         const response = await api.get('/admin/categories');
-        setCategories(response || []);
+        console.log('Categories from API:', response);
+        
+        if (response && Array.isArray(response)) {
+          // Tìm danh mục Quần và Áo
+          const mainCategories = response.filter(cat => cat.name === 'Quần' || cat.name === 'Áo');
+          
+          // Nếu có kết quả, thêm subcategories
+          if (mainCategories.length > 0) {
+            mainCategories.forEach(mainCat => {
+              // Thêm "nam" vào tên danh mục
+              mainCat.name = `${mainCat.name} nam`;
+              
+              // Tìm các danh mục con
+              mainCat.subcategories = response.filter(cat => cat.parent_id === mainCat.id);
+            });
+            
+            console.log('Main categories (Quần nam, Áo nam):', mainCategories);
+            
+            // Tạo danh sách phẳng gồm cả danh mục chính và phụ
+            const flatCategories = [...mainCategories];
+            
+            // Thêm các danh mục con vào danh sách
+            mainCategories.forEach(mainCat => {
+              if (mainCat.subcategories && mainCat.subcategories.length > 0) {
+                flatCategories.push(...mainCat.subcategories);
+              }
+            });
+            
+            console.log('Flattened categories for select:', flatCategories);
+            setCategories(flatCategories);
+          } else {
+            console.log('Main categories not found, using fallback');
+            // Fallback nếu không tìm thấy danh mục chính
+            const quanNam = { 
+              id: 2, 
+              name: 'Quần nam', 
+              description: 'Quần nam các loại',
+            };
+            
+            const aoNam = { 
+              id: 3, 
+              name: 'Áo nam', 
+              description: 'Áo nam các loại',
+            };
+            
+            const subcategories = [
+              { id: 5, name: 'Quần short', description: 'Quần short nam', parent_id: 2 },
+              { id: 6, name: 'Quần jeans', description: 'Quần jeans nam', parent_id: 2 },
+              { id: 7, name: 'Quần âu', description: 'Quần âu nam', parent_id: 2 },
+              { id: 8, name: 'Quần kaki', description: 'Quần kaki nam dài', parent_id: 2 },
+              { id: 9, name: 'Áo thun', description: 'Áo thun nam', parent_id: 3 },
+              { id: 10, name: 'Áo polo', description: 'Áo polo nam', parent_id: 3 },
+              { id: 11, name: 'Áo sơ mi', description: 'Áo sơ mi nam', parent_id: 3 },
+              { id: 12, name: 'Áo khoác', description: 'Áo khoác nam', parent_id: 3 },
+              { id: 13, name: 'Áo len', description: 'Áo len nam', parent_id: 3 }
+            ];
+            
+            const fallbackCategories = [quanNam, aoNam, ...subcategories];
+            setCategories(fallbackCategories);
+          }
+        } else {
+          console.error('Invalid response format from categories API:', response);
+          setError('Không thể tải danh mục sản phẩm: Định dạng dữ liệu không hợp lệ');
+          setCategories([]);
+        }
       } catch (error) {
         console.error('Error fetching categories:', error);
         setError('Không thể tải danh mục sản phẩm');
+        
+        // Fallback khi có lỗi
+        const quanNam = { 
+          id: 2, 
+          name: 'Quần nam', 
+          description: 'Quần nam các loại',
+        };
+        
+        const aoNam = { 
+          id: 3, 
+          name: 'Áo nam', 
+          description: 'Áo nam các loại',
+        };
+        
+        const subcategories = [
+          { id: 5, name: 'Quần short', description: 'Quần short nam', parent_id: 2 },
+          { id: 6, name: 'Quần jeans', description: 'Quần jeans nam', parent_id: 2 },
+          { id: 7, name: 'Quần âu', description: 'Quần âu nam', parent_id: 2 },
+          { id: 8, name: 'Quần kaki', description: 'Quần kaki nam dài', parent_id: 2 },
+          { id: 9, name: 'Áo thun', description: 'Áo thun nam', parent_id: 3 },
+          { id: 10, name: 'Áo polo', description: 'Áo polo nam', parent_id: 3 },
+          { id: 11, name: 'Áo sơ mi', description: 'Áo sơ mi nam', parent_id: 3 },
+          { id: 12, name: 'Áo khoác', description: 'Áo khoác nam', parent_id: 3 },
+          { id: 13, name: 'Áo len', description: 'Áo len nam', parent_id: 3 }
+        ];
+        
+        const fallbackCategories = [quanNam, aoNam, ...subcategories];
+        setCategories(fallbackCategories);
       }
     };
     

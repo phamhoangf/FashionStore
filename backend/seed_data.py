@@ -322,7 +322,7 @@ if __name__ == "__main__":
         
         # Thêm dữ liệu mẫu
         seed_users()
-        seed_categories()
-        seed_products()
+        # seed_categories()
+        # seed_products()
         
         print("Hoàn thành thêm dữ liệu mẫu!") 

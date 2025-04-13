@@ -12,40 +12,76 @@ const OrderSuccessPage = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { clearCart } = useContext(CartContext);
+  const { clearCart, removeSelectedItems, cart } = useContext(CartContext);
 
   // Kiểm tra xem có phải từ VNPay chuyển về không
   const isFromVNPay = location.search.includes('vnp_ResponseCode');
   const vnpResponseCode = new URLSearchParams(location.search).get('vnp_ResponseCode');
   const paymentSuccess = vnpResponseCode === '00';
 
-  // Đảm bảo giỏ hàng được xóa khi đến trang này, nhất là khi từ VNPay chuyển về
+  // Đảm bảo chỉ những sản phẩm đã mua được xóa khỏi giỏ hàng, không phải toàn bộ giỏ hàng
   useEffect(() => {
-    const ensureCartCleared = async () => {
+    const removeOrderedItems = async () => {
       try {
-        // Đảm bảo giỏ hàng được xóa, đặc biệt khi từ VNPay redirect về
-        await clearCart(true);
+        // Lấy danh sách ID sản phẩm đã chọn từ localStorage
+        const selectedItemsStr = localStorage.getItem('selectedCartItems');
         
-        // Force immediate visual update of the cart badge
-        try {
-          const cartBadges = document.querySelectorAll('.position-absolute.badge');
-          cartBadges.forEach(badge => {
-            if (badge.parentElement?.textContent.includes('Giỏ hàng')) {
-              badge.style.display = 'none';
+        if (selectedItemsStr) {
+          try {
+            const selectedItems = JSON.parse(selectedItemsStr);
+            console.log('Removing ordered items from cart:', selectedItems);
+            
+            // Xóa chỉ những sản phẩm đã mua
+            if (selectedItems && selectedItems.length > 0) {
+              await removeSelectedItems(selectedItems, true);
+              
+              // Xóa giữ liệu từ localStorage sau khi đã xử lý
+              localStorage.removeItem('selectedCartItems');
+              
+              // Force immediate visual update of the cart badge
+              setTimeout(() => {
+                const remainingCount = cart.length;
+                console.log('Remaining cart items after removal:', remainingCount);
+                
+                try {
+                  const cartBadges = document.querySelectorAll('.position-absolute.badge');
+                  cartBadges.forEach(badge => {
+                    if (badge.parentElement?.textContent.includes('Giỏ hàng')) {
+                      console.log('Setting badge text content to:', remainingCount);
+                      badge.textContent = remainingCount > 0 ? remainingCount.toString() : '';
+                      
+                      if (remainingCount === 0) {
+                        badge.style.display = 'none';
+                      } else {
+                        badge.style.display = '';
+                      }
+                      
+                      // Trigger a custom event to ensure Header component updates
+                      window.dispatchEvent(new CustomEvent('cart-updated', { 
+                        detail: { count: remainingCount } 
+                      }));
+                    }
+                  });
+                } catch (domError) {
+                  console.error('DOM update failed:', domError);
+                }
+              }, 100);
             }
-          });
-        } catch (domError) {
-          console.error('DOM update failed:', domError);
+            
+            console.log('Selected items removed from cart on OrderSuccessPage load');
+          } catch (parseError) {
+            console.error('Error parsing selectedItems from localStorage:', parseError);
+          }
+        } else {
+          console.log('No selectedItems found in localStorage');
         }
-        
-        console.log('Cart cleared on OrderSuccessPage load');
       } catch (error) {
-        console.error('Error clearing cart:', error);
+        console.error('Error removing selected items from cart:', error);
       }
     };
 
-    ensureCartCleared();
-  }, [clearCart]);
+    removeOrderedItems();
+  }, [removeSelectedItems, cart]);
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -190,4 +226,4 @@ const OrderSuccessPage = () => {
   );
 };
 
-export default OrderSuccessPage; 
+export default OrderSuccessPage;

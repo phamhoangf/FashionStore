@@ -25,6 +25,9 @@ const ProductsPage = () => {
   const [searchInput, setSearchInput] = useState(filters.search);
   const [searchTimeout, setSearchTimeout] = useState(null);
 
+  // Thêm state mới cho pageTitle
+  const [pageTitle, setPageTitle] = useState('Tất cả sản phẩm');
+
   // Theo dõi thay đổi trong URL để cập nhật bộ lọc
   useEffect(() => {
     // Reset tất cả bộ lọc khi có tham số từ URL mới
@@ -129,37 +132,119 @@ const ProductsPage = () => {
         const data = await getCategories();
         console.log('Categories data from API:', data);
         
-        // Tạo danh sách đầy đủ các danh mục
-        const allCategories = data;
+        // Tìm danh mục Quần và Áo
+        const mainCategories = data.filter(cat => cat.name === 'Quần' || cat.name === 'Áo');
         
-        // Lọc danh mục gốc (không có parent_id)
-        const rootCategories = data.filter(cat => !cat.parent_id);
-        
-        // Gán subcategories cho mỗi danh mục gốc
-        rootCategories.forEach(rootCat => {
-          rootCat.subcategories = data.filter(cat => cat.parent_id === rootCat.id);
-        });
-        
-        console.log('Organized categories with subcategories:', rootCategories);
-        
-        // Lưu cả danh sách đầy đủ và danh sách phân cấp
-        setCategories(rootCategories);
-        
-        // Tìm parent category nếu đang chọn subcategory
-        if (filters.category && !filters.parentCategory) {
-          // Kiểm tra xem category hiện tại có phải là subcategory không
-          const selectedCategory = allCategories.find(cat => cat.id.toString() === filters.category.toString());
-          if (selectedCategory && selectedCategory.parent_id) {
-            // Nếu là subcategory, cập nhật cả parent category và subcategory
-            setFilters(prev => ({
-              ...prev,
-              parentCategory: selectedCategory.parent_id.toString(),
-              subcategory: selectedCategory.id.toString()
-            }));
+        // Nếu có kết quả, thêm subcategories
+        if (mainCategories.length > 0) {
+          mainCategories.forEach(mainCat => {
+            // Thêm "nam" vào tên danh mục
+            mainCat.name = `${mainCat.name} nam`;
+            
+            // Tìm các danh mục con
+            mainCat.subcategories = data.filter(cat => cat.parent_id === mainCat.id);
+          });
+          
+          console.log('Main categories (Quần nam, Áo nam):', mainCategories);
+          setCategories(mainCategories);
+          
+          // Xử lý subcategory trong trường hợp đã có category filter
+          if (filters.category && !filters.parentCategory) {
+            // Tìm xem category đã chọn có phải là subcategory không
+            let parentFound = false;
+            
+            // Tìm qua tất cả danh mục chính
+            for (const mainCat of mainCategories) {
+              // Tìm qua các danh mục con
+              const subcat = mainCat.subcategories.find(
+                sub => sub.id.toString() === filters.category.toString()
+              );
+              
+              if (subcat) {
+                console.log(`Found that category ${filters.category} is a subcategory of ${mainCat.id}`);
+                // Cập nhật cả parentCategory và subcategory
+                setFilters(prev => ({
+                  ...prev,
+                  parentCategory: mainCat.id.toString(),
+                  subcategory: subcat.id.toString()
+                }));
+                parentFound = true;
+                break;
+              }
+            }
+            
+            // Nếu không tìm thấy trong subcategory, kiểm tra xem có phải là mainCategory không
+            if (!parentFound) {
+              const mainCat = mainCategories.find(cat => cat.id.toString() === filters.category.toString());
+              if (mainCat) {
+                console.log(`Found that category ${filters.category} is a main category`);
+                setFilters(prev => ({
+                  ...prev,
+                  parentCategory: mainCat.id.toString(),
+                  subcategory: ''
+                }));
+              }
+            }
           }
+        } else {
+          console.log('Main categories not found, using fallback');
+          // Fallback nếu không tìm thấy danh mục chính
+          const fallbackCategories = [
+            { 
+              id: 2, 
+              name: 'Quần nam', 
+              description: 'Quần nam các loại',
+              subcategories: [
+                { id: 5, name: 'Quần short', description: 'Quần short nam' },
+                { id: 6, name: 'Quần jeans', description: 'Quần jeans nam' },
+                { id: 7, name: 'Quần âu', description: 'Quần âu nam' },
+                { id: 8, name: 'Quần kaki', description: 'Quần kaki nam dài' }
+              ]
+            },
+            { 
+              id: 3, 
+              name: 'Áo nam', 
+              description: 'Áo nam các loại',
+              subcategories: [
+                { id: 9, name: 'Áo thun', description: 'Áo thun nam' },
+                { id: 10, name: 'Áo polo', description: 'Áo polo nam' },
+                { id: 11, name: 'Áo sơ mi', description: 'Áo sơ mi nam' },
+                { id: 12, name: 'Áo khoác', description: 'Áo khoác nam' },
+                { id: 13, name: 'Áo len', description: 'Áo len nam' }
+              ]
+            }
+          ];
+          setCategories(fallbackCategories);
         }
       } catch (error) {
         console.error('Error fetching categories:', error);
+        // Fallback khi có lỗi
+        const fallbackCategories = [
+          { 
+            id: 2, 
+            name: 'Quần nam', 
+            description: 'Quần nam các loại',
+            subcategories: [
+              { id: 5, name: 'Quần short', description: 'Quần short nam' },
+              { id: 6, name: 'Quần jeans', description: 'Quần jeans nam' },
+              { id: 7, name: 'Quần âu', description: 'Quần âu nam' },
+              { id: 8, name: 'Quần kaki', description: 'Quần kaki nam dài' }
+            ]
+          },
+          { 
+            id: 3, 
+            name: 'Áo nam', 
+            description: 'Áo nam các loại',
+            subcategories: [
+              { id: 9, name: 'Áo thun', description: 'Áo thun nam' },
+              { id: 10, name: 'Áo polo', description: 'Áo polo nam' },
+              { id: 11, name: 'Áo sơ mi', description: 'Áo sơ mi nam' },
+              { id: 12, name: 'Áo khoác', description: 'Áo khoác nam' },
+              { id: 13, name: 'Áo len', description: 'Áo len nam' }
+            ]
+          }
+        ];
+        setCategories(fallbackCategories);
       }
     };
 
@@ -235,78 +320,98 @@ const ProductsPage = () => {
 
   const totalPages = Math.ceil(total / 12);
 
-  return (
-    <Container className="py-5">
-      <h1 className="mb-4">Sản phẩm</h1>
-      
-      {error && (
-        <Alert variant="danger" dismissible onClose={() => setError(null)}>
-          <i className="bi bi-exclamation-triangle-fill me-2"></i>
-          {error}
-        </Alert>
-      )}
-      
-      {/* Hiển thị kết quả tìm kiếm nếu có */}
-      {filters.search && (
+  // Cập nhật phần hiển thị thông tin lọc trên đầu trang
+  const renderFilterInfo = () => {
+    const selectedParentCategory = filters.parentCategory ? 
+      categories.find(c => c.id.toString() === filters.parentCategory) : null;
+    
+    let selectedSubcategory = null;
+    if (filters.subcategory && selectedParentCategory) {
+      selectedSubcategory = selectedParentCategory.subcategories.find(
+        sc => sc.id.toString() === filters.subcategory
+      );
+    }
+    
+    if (selectedParentCategory || filters.search) {
+      return (
         <Alert variant="info" className="d-flex justify-content-between align-items-center">
           <div>
-            Kết quả tìm kiếm cho: <strong>"{filters.search}"</strong> 
-            {total > 0 ? <span className="search-result-count"> ({total} sản phẩm)</span> : ''}
-          </div>
-          <Button variant="outline-secondary" size="sm" onClick={clearSearch}>
-            Xóa tìm kiếm
-          </Button>
-        </Alert>
-      )}
-      
-      {/* Hiển thị filter theo category hoặc subcategory */}
-      {(filters.parentCategory || filters.subcategory) && (
-        <Alert variant="info" className="d-flex justify-content-between align-items-center">
-          <div>
-            {filters.parentCategory && (
+            {selectedParentCategory && (
               <span>
-                Danh mục: <strong>
-                  {categories.find(c => c.id.toString() === filters.parentCategory)?.name || 'Danh mục đã chọn'}
-                </strong>
+                <strong>Danh mục:</strong> {selectedParentCategory.name}
+                {selectedSubcategory && ` > ${selectedSubcategory.name}`}
               </span>
             )}
-            {filters.subcategory && (
-              <span className="ms-2">
-                | Danh mục con: <strong>
-                  {(() => {
-                    // Tìm parent category
-                    const parentCat = categories.find(c => c.id.toString() === filters.parentCategory);
-                    if (!parentCat) return filters.subcategory;
-                    
-                    // Tìm subcategory trong parent category
-                    const subCat = parentCat.subcategories.find(
-                      sc => sc.id.toString() === filters.subcategory
-                    );
-                    
-                    return subCat ? subCat.name : filters.subcategory;
-                  })()}
-                </strong>
+            {filters.search && (
+              <span>
+                {selectedParentCategory && ' | '}
+                <strong>Tìm kiếm:</strong> {filters.search}
               </span>
             )}
-            {total > 0 ? <span className="search-result-count ms-2">({total} sản phẩm)</span> : ''}
           </div>
-          <Button 
-            variant="outline-secondary" 
-            size="sm" 
+          <Button
+            variant="outline-primary"
+            size="sm"
             onClick={() => {
               setFilters(prev => ({
                 ...prev,
+                search: '',
                 category: '',
                 parentCategory: '',
                 subcategory: '',
-                page: 1
+                page: 1,
+                timestamp: Date.now().toString()
               }));
             }}
           >
-            Xóa bộ lọc danh mục
+            Xóa bộ lọc
           </Button>
         </Alert>
-      )}
+      );
+    }
+    return null;
+  }
+
+  // Thêm hàm handleSortChange
+  const handleSortChange = (sortValue) => {
+    handleFilterChange('sort', sortValue);
+  };
+
+  // Cập nhật page title dựa trên bộ lọc hiện tại
+  useEffect(() => {
+    let title = 'Tất cả sản phẩm';
+    
+    if (filters.parentCategory) {
+      const parentCategory = categories.find(c => c.id.toString() === filters.parentCategory);
+      if (parentCategory) {
+        title = parentCategory.name;
+        
+        if (filters.subcategory) {
+          const subcategory = parentCategory.subcategories.find(
+            sc => sc.id.toString() === filters.subcategory
+          );
+          if (subcategory) {
+            title = subcategory.name;
+          }
+        }
+      }
+    }
+    
+    if (filters.search) {
+      title = `Kết quả tìm kiếm: "${filters.search}"`;
+    }
+    
+    setPageTitle(title);
+  }, [filters.parentCategory, filters.subcategory, filters.search, categories]);
+
+  return (
+    <Container className="py-4">
+      <h1 className="mb-4 shop-title">
+        <i className="bi bi-shop me-2"></i> 
+        MenStyle - Thời trang nam
+      </h1>
+      
+      {renderFilterInfo()}
       
       <Row>
         <Col md={3}>
@@ -493,70 +598,109 @@ const ProductsPage = () => {
           </Card>
         </Col>
         
-        <Col md={9}>
+        <Col md={9} className="products-container">
+          {/* Hiển thị tiêu đề trang */}
+          <div className="products-header d-flex justify-content-between align-items-center mb-4">
+            <h2>{pageTitle}</h2>
+            <div>
+              <Form.Select
+                value={filters.sort}
+                onChange={(e) => handleSortChange(e.target.value)}
+                className="form-select-sm"
+                style={{ width: 'auto' }}
+              >
+                <option value="newest">Mới nhất</option>
+                <option value="price_asc">Giá tăng dần</option>
+                <option value="price_desc">Giá giảm dần</option>
+                <option value="name_asc">Tên A-Z</option>
+                <option value="name_desc">Tên Z-A</option>
+              </Form.Select>
+            </div>
+          </div>
+          
+          {/* Hiển thị active filters */}
+          {(filters.parentCategory || filters.subcategory) && (
+            <div className="active-filters mb-3">
+              <p className="mb-2">Bộ lọc đang áp dụng:</p>
+              <div className="d-flex flex-wrap gap-2">
+                {/* ... existing code ... */}
+              </div>
+            </div>
+          )}
+          
+          {/* Hiển thị thông báo lỗi nếu có */}
+          {error && (
+            <Alert variant="danger" className="my-3">
+              <Alert.Heading>Không thể tải danh sách sản phẩm</Alert.Heading>
+              <p>Đã xảy ra lỗi khi tải danh sách sản phẩm. Vui lòng thử lại sau.</p>
+              <div className="d-flex justify-content-end">
+                <Button 
+                  variant="outline-danger" 
+                  onClick={() => {
+                    setError(null);
+                    fetchProducts();
+                  }}
+                >
+                  Thử lại
+                </Button>
+              </div>
+            </Alert>
+          )}
+          
+          {/* Hiển thị danh sách sản phẩm */}
           {loading ? (
-            <div className="text-center p-5">
-              <Spinner animation="border" variant="primary" />
-              <p className="mt-3">Đang tải sản phẩm...</p>
+            <div className="text-center py-5">
+              <Spinner animation="border" role="status">
+                <span className="visually-hidden">Đang tải...</span>
+              </Spinner>
             </div>
           ) : (
             <>
-              {products.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon">
-                    <i className="bi bi-search"></i>
-                  </div>
-                  <p className="empty-state-text">
-                    Không tìm thấy sản phẩm nào phù hợp với tiêu chí tìm kiếm.
-                  </p>
-                  <Button variant="primary" onClick={clearAllFilters}>
-                    Xóa bộ lọc
-                  </Button>
-                </div>
+              {products.length > 0 ? (
+                <ProductList products={products} />
               ) : (
-                <div className="search-result-item">
-                  <ProductList products={products} />
-                </div>
-              )}
-              
-              {totalPages > 1 && (
-                <nav className="mt-4">
-                  <ul className="pagination justify-content-center">
-                    <li className={`page-item ${filters.page === 1 ? 'disabled' : ''}`}>
-                      <button
-                        className="page-link"
-                        onClick={() => handleFilterChange('page', filters.page - 1)}
-                      >
-                        Trước
-                      </button>
-                    </li>
-                    
-                    {[...Array(totalPages).keys()].map(page => (
-                      <li
-                        key={page + 1}
-                        className={`page-item ${filters.page === page + 1 ? 'active' : ''}`}
-                      >
-                        <button
-                          className="page-link"
-                          onClick={() => handleFilterChange('page', page + 1)}
-                        >
-                          {page + 1}
-                        </button>
-                      </li>
-                    ))}
-                    
-                    <li className={`page-item ${filters.page === totalPages ? 'disabled' : ''}`}>
-                      <button
-                        className="page-link"
-                        onClick={() => handleFilterChange('page', filters.page + 1)}
-                      >
-                        Sau
-                      </button>
-                    </li>
-                  </ul>
-                </nav>
+                <p className="text-center py-5">Không tìm thấy sản phẩm phù hợp với bộ lọc của bạn.</p>
               )}
             </>
+          )}
+          
+          {/* Phân trang */}
+          {totalPages > 1 && (
+            <nav className="mt-4">
+              <ul className="pagination justify-content-center">
+                <li className={`page-item ${filters.page === 1 ? 'disabled' : ''}`}>
+                  <button
+                    className="page-link"
+                    onClick={() => handleFilterChange('page', filters.page - 1)}
+                  >
+                    Trước
+                  </button>
+                </li>
+                
+                {[...Array(totalPages).keys()].map(page => (
+                  <li
+                    key={page + 1}
+                    className={`page-item ${filters.page === page + 1 ? 'active' : ''}`}
+                  >
+                    <button
+                      className="page-link"
+                      onClick={() => handleFilterChange('page', page + 1)}
+                    >
+                      {page + 1}
+                    </button>
+                  </li>
+                ))}
+                
+                <li className={`page-item ${filters.page === totalPages ? 'disabled' : ''}`}>
+                  <button
+                    className="page-link"
+                    onClick={() => handleFilterChange('page', filters.page + 1)}
+                  >
+                    Sau
+                  </button>
+                </li>
+              </ul>
+            </nav>
           )}
         </Col>
       </Row>

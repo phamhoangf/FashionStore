@@ -58,6 +58,9 @@ class OrderService:
             db.session.add(order)
             db.session.flush()  # Để lấy ID của order
             
+            # Lưu danh sách ID sản phẩm đã thêm vào đơn hàng để chỉ xóa các sản phẩm này khỏi giỏ hàng
+            order_item_ids = []
+            
             # Thêm các sản phẩm vào đơn hàng
             for cart_item in cart_items:
                 if not cart_item.product:
@@ -70,10 +73,18 @@ class OrderService:
                     price=cart_item.product.price
                 )
                 db.session.add(order_item)
+                
+                # Lưu ID của cart_item để xóa sau
+                order_item_ids.append(cart_item.id)
             
-            # Xóa giỏ hàng
+            # Xóa chỉ những sản phẩm đã thêm vào đơn hàng khỏi giỏ hàng
+            # Ghi log trước khi xóa để debug
+            current_app.logger.info(f"Removing selected cart items: {order_item_ids}")
+            
+            # Xóa từng sản phẩm đã chọn khỏi giỏ hàng
             for cart_item in cart_items:
-                db.session.delete(cart_item)
+                if cart_item.id in order_item_ids:
+                    db.session.delete(cart_item)
             
             db.session.commit()
             return order

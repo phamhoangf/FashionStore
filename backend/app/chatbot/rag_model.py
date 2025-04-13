@@ -78,8 +78,12 @@ class RAGChatbot:
             self.prompt_template = PromptTemplate(
                 input_variables=["question", "context"],
                 template="""
-                Bạn là trợ lý ảo của một cửa hàng thời trang trực tuyến. Nhiệm vụ của bạn là trả lời các câu hỏi của khách hàng 
+                Bạn là trợ lý ảo của một cửa hàng thời trang nam. Nhiệm vụ của bạn là trả lời các câu hỏi của khách hàng 
                 một cách chính xác, lịch sự và hữu ích.
+                
+                Cửa hàng chúng tôi chuyên kinh doanh các sản phẩm thời trang nam cao cấp với hai danh mục chính:
+                1. QUẦN NAM: gồm quần short, quần jeans, quần âu, quần kaki
+                2. ÁO NAM: gồm áo thun, áo polo, áo sơ mi, áo khoác, áo len
                 
                 Dựa trên các thông tin từ cửa hàng được cung cấp bên dưới, hãy trả lời câu hỏi của khách hàng.
                 Nếu bạn không tìm thấy câu trả lời trong thông tin được cung cấp, hãy nói rằng bạn không có thông tin về vấn đề đó 
@@ -165,7 +169,7 @@ class RAGChatbot:
                 # Make sure parent directory exists
                 os.makedirs(os.path.dirname(full_path), exist_ok=True)
                 logger.info(f"Saving vector store to {full_path}")
-                vectorstore.save_local("vector_store")
+                vectorstore.save_local("app/vector_store")
                 logger.info(f"Vector store saved to {FAISS_INDEX_PATH}")
             except Exception as e:
                 logger.error(f"Failed to save vector store: {e}")
@@ -244,4 +248,4 @@ def get_chatbot_instance(rebuild_index: bool = False) -> RAGChatbot:
     except Exception as e:
         logger.error(f"Error getting chatbot instance: {e}")
         logger.error(traceback.format_exc())
-        raise 
+        raise

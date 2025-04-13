@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app import db
 from app.models.product import Product
 from app.models.category import Category
@@ -101,46 +101,67 @@ def get_product(id):
 @jwt_required()
 def create_product():
     # Kiểm tra quyền admin
-    user_id = get_jwt_identity()
+    claims = get_jwt()
+    if not claims.get('is_admin', False):
+        return jsonify({'error': 'Unauthorized access'}), 403
     
-    # Xử lý form data
-    name = request.form.get('name')
-    description = request.form.get('description')
-    price = request.form.get('price', type=float)
-    discount_price = request.form.get('discount_price', type=float)
-    stock = request.form.get('stock', type=int)
-    category_id = request.form.get('category_id', type=int)
-    featured = request.form.get('featured', '').lower() == 'true'
+    data = request.json
     
-    if not name or not price or not category_id:
-        return jsonify({'error': 'Thông tin không đầy đủ'}), 400
-    
-    # Xử lý hình ảnh
-    image_url = None
-    if 'image' in request.files:
-        file = request.files['image']
-        if file and allowed_file(file.filename):
-            filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
-            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            # Sử dụng đường dẫn tương đối cho image_url
-            image_url = f"uploads/{filename}"
-            current_app.logger.info(f"Saved image to: {filepath}")
-            current_app.logger.info(f"Image URL: {image_url}")
+    # Kiểm tra dữ liệu đầu vào
+    required_fields = ['name', 'price', 'category_id']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'Field {field} is required'}), 400
     
     # Tạo sản phẩm mới
     product = Product(
-        name=name,
-        description=description,
-        price=price,
-        discount_price=discount_price,
-        stock=stock,
-        category_id=category_id,
-        image_url=image_url,
-        featured=featured
+        name=data['name'],
+        description=data.get('description', ''),
+        price=data['price'],
+        discount_price=data.get('discount_price'),
+        stock=data.get('stock', 0),
+        category_id=data['category_id'],
+        image_url=data.get('image_url', ''),
+        featured=data.get('featured', False),
+        sizes=data.get('sizes', '')  # Xử lý sizes
     )
     
     db.session.add(product)
     db.session.commit()
     
     return jsonify(product.to_dict()), 201
+
+@bp.route('/<int:id>', methods=['PUT'])
+@jwt_required()
+def update_product(id):
+    # Kiểm tra quyền admin
+    claims = get_jwt()
+    if not claims.get('is_admin', False):
+        return jsonify({'error': 'Unauthorized access'}), 403
+    
+    product = Product.query.get_or_404(id)
+    data = request.json
+    
+    # Cập nhật thông tin sản phẩm
+    if 'name' in data:
+        product.name = data['name']
+    if 'description' in data:
+        product.description = data['description']
+    if 'price' in data:
+        product.price = data['price']
+    if 'discount_price' in data:
+        product.discount_price = data['discount_price']
+    if 'stock' in data:
+        product.stock = data['stock']
+    if 'category_id' in data:
+        product.category_id = data['category_id']
+    if 'image_url' in data:
+        product.image_url = data['image_url']
+    if 'featured' in data:
+        product.featured = data['featured']
+    if 'sizes' in data:  # Xử lý sizes
+        product.sizes = data['sizes']
+    
+    db.session.commit()
+    
+    return jsonify(product.to_dict())

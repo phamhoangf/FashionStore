@@ -104,10 +104,10 @@ def create_vnpay_payment(order_id, amount, order_desc, bank_code=None):
         
         # Return the full VNPAY URL
         payment_url = current_app.config['VNPAY_PAYMENT_URL'] + '?' + query + '&vnp_SecureHash=' + vnp['vnp_SecureHash']
-        
+            
         # Log the generated URL
         current_app.logger.info(f"Generated VNPay URL for order {order_id}: {payment_url[:100]}...")
-        
+            
         return payment_url
     except Exception as e:
         current_app.logger.error(f"Error generating VNPay URL for order {order_id}: {str(e)}")

@@ -13,9 +13,13 @@ def vnpay_return():
     for key, value in request.args.items():
         vnp_params[key] = value
     
+    # Log tất cả tham số từ VNPay để debug
+    current_app.logger.info(f"Received VNPay return params: {vnp_params}")
+    
     # Kiểm tra chữ ký
     is_valid = PaymentService.validate_payment_response(vnp_params)
     if not is_valid:
+        current_app.logger.error("VNPay signature validation failed")
         # Trả về trang lỗi
         return redirect(f"{current_app.config.get('FRONTEND_URL', 'http://localhost:3000')}/payment/error")
     
@@ -23,10 +27,21 @@ def vnpay_return():
     order_id = int(vnp_params.get('vnp_TxnRef'))
     response_code = vnp_params.get('vnp_ResponseCode')
     transaction_id = vnp_params.get('vnp_TransactionNo')
+    amount = vnp_params.get('vnp_Amount')
     
     # Xử lý kết quả thanh toán
     is_success = response_code == '00'
-    PaymentService.process_payment_result(order_id, is_success, transaction_id)
+    
+    # Ghi log thông tin chi tiết
+    current_app.logger.info(f"Processing VNPay payment: order_id={order_id}, response_code={response_code}, amount={amount}")
+    
+    PaymentService.process_payment_result(
+        order_id=order_id, 
+        is_success=is_success, 
+        transaction_id=transaction_id,
+        amount=amount,
+        payment_params=vnp_params
+    )
     
     # Chuyển hướng về trang kết quả thanh toán
     if is_success:
@@ -42,7 +57,8 @@ def create_payment(order_id):
     try:
         # Kiểm tra quyền truy cập đơn hàng
         order = Order.query.get_or_404(order_id)
-        if order.user_id != user_id:
+        # Chuyển đổi cả hai giá trị thành string để so sánh an toàn
+        if str(order.user_id) != str(user_id):
             return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
         
         # Nếu đơn hàng đã thanh toán
@@ -67,7 +83,7 @@ def check_payment_status(order_id):
     
     # Kiểm tra quyền truy cập đơn hàng
     order = Order.query.get_or_404(order_id)
-    if order.user_id != user_id:
+    if str(order.user_id) != str(user_id):
         return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
     
     return jsonify({

@@ -15,6 +15,7 @@ import ChatbotModal from './components/chatbot/ChatbotModal';
 const Layout = React.lazy(() => import('./components/layout/Layout'));
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const ProductsPage = React.lazy(() => import('./pages/ProductsPage'));
+const SearchResultsPage = React.lazy(() => import('./pages/SearchResultsPage'));
 const ProductDetailPage = React.lazy(() => import('./pages/ProductDetailPage'));
 const CartPage = React.lazy(() => import('./pages/CartPage'));
 const CheckoutPage = React.lazy(() => import('./pages/CheckoutPage'));
@@ -33,6 +34,7 @@ const ProductForm = React.lazy(() => import('./pages/admin/ProductForm'));
 const CategoryList = React.lazy(() => import('./pages/admin/CategoryList'));
 const OrderList = React.lazy(() => import('./pages/admin/OrderList'));
 const OrderDetail = React.lazy(() => import('./pages/admin/OrderDetail'));
+const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'));
 
 // Memoized loading component
 const LoadingSpinner = React.memo(() => (
@@ -54,6 +56,7 @@ const App = () => {
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="products" element={<ProductsPage />} />
+        <Route path="search" element={<SearchResultsPage />} />
         <Route path="products/:id" element={<ProductDetailPage />} />
         <Route path="cart" element={<CartPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
@@ -64,8 +67,8 @@ const App = () => {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="orders/:id" element={<OrderDetailPage />} />
-        {/* Fallback route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Fallback route - use NotFoundPage instead of redirect */}
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
       
       {/* Admin routes */}
@@ -79,6 +82,8 @@ const App = () => {
         <Route path="categories" element={<CategoryList />} />
         <Route path="orders" element={<OrderList />} />
         <Route path="orders/:id" element={<OrderDetail />} />
+        {/* Add NotFoundPage for admin routes as well */}
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   ), []);

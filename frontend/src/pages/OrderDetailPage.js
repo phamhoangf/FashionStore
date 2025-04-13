@@ -4,15 +4,14 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { formatImageUrl } from '../utils/imageUtils';
 import { getOrderDetails, cancelOrder } from '../services/orderService';
+import { toast } from 'react-toastify';
 
 const OrderDetailPage = () => {
   const { id } = useParams();
-  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [unauthorized, setUnauthorized] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   useEffect(() => {
@@ -20,13 +19,11 @@ const OrderDetailPage = () => {
       if (!user) {
         console.log('No authenticated user, showing unauthorized state');
         setLoading(false);
-        setUnauthorized(true);
         return;
       }
 
       try {
         setLoading(true);
-        setError(''); // Reset error state
         
         console.log(`Fetching order details for ID: ${id}, current user ID: ${user.id}`);
         const response = await getOrderDetails(id);
@@ -35,10 +32,8 @@ const OrderDetailPage = () => {
         if (response) {
           console.log('Order details received:', response);
           setOrder(response);
-          setUnauthorized(false); // Đảm bảo unauthorized được thiết lập là false
         } else {
           console.error('Empty response from API');
-          setError('Không tìm thấy thông tin đơn hàng');
         }
       } catch (error) {
         console.error('Error fetching order details:', error);
@@ -46,7 +41,6 @@ const OrderDetailPage = () => {
         // Kiểm tra lỗi 403 - Không có quyền truy cập
         if (error.response && error.response.status === 403) {
           console.warn('User is unauthorized to view this order (403)');
-          setUnauthorized(true);
         } else {
           // Lấy thông báo lỗi từ response hoặc sử dụng thông báo mặc định
           const errorMessage = 
@@ -55,7 +49,6 @@ const OrderDetailPage = () => {
             'Không thể tải thông tin đơn hàng. Vui lòng thử lại sau.';
           
           console.error('Setting error message:', errorMessage);
-          setError(errorMessage);
         }
       } finally {
         setLoading(false);
@@ -140,20 +133,27 @@ const OrderDetailPage = () => {
     try {
       setLoading(true);
       const response = await cancelOrder(id);
-      
-      if (response) {
-        setOrder(response);
+      if (response && response.success) {
+        toast.success('Đơn hàng đã được hủy thành công');
+        // Cập nhật trạng thái đơn hàng
+        setOrder({
+          ...order,
+          status: 'Đã hủy'
+        });
         setShowCancelModal(false);
-        alert('Đơn hàng đã được hủy thành công');
+      } else {
+        toast.error('Không thể hủy đơn hàng. Vui lòng thử lại sau.');
       }
     } catch (error) {
-      alert(error.response?.data?.error || 'Không thể hủy đơn hàng. Vui lòng thử lại sau.');
+      console.error('Error canceling order:', error);
+      const errorMessage = error.response?.data?.message || 'Không thể hủy đơn hàng. Vui lòng thử lại sau.';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  if (!user || unauthorized) {
+  if (!user) {
     return (
       <Container className="py-5">
         <Alert variant="warning">
@@ -177,11 +177,11 @@ const OrderDetailPage = () => {
     );
   }
 
-  if (error || !order) {
+  if (!order) {
     return (
       <Container className="py-5">
         <Alert variant="danger">
-          {error || 'Không tìm thấy thông tin đơn hàng'}
+          {'Không tìm thấy thông tin đơn hàng'}
         </Alert>
         <Button variant="primary" onClick={() => navigate('/orders')}>
           Quay lại danh sách đơn hàng
