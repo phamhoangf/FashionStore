@@ -3,6 +3,7 @@ from app.models.cart import CartItem
 from app import db
 from datetime import datetime
 from flask import current_app
+import traceback  # Import module traceback
 
 class OrderService:
     @staticmethod
@@ -171,23 +172,29 @@ class OrderService:
         """
         try:
             if not order_id:
+                current_app.logger.error("Invalid order ID: None or empty")
                 raise ValueError("ID đơn hàng không hợp lệ")
             
             # Chuyển đổi order_id sang integer nếu là string
             if isinstance(order_id, str) and order_id.isdigit():
                 order_id = int(order_id)
             
+            current_app.logger.info(f"Looking up order with ID: {order_id}")
             order = Order.query.get(order_id)
+            
             if not order:
+                current_app.logger.warning(f"Order not found with ID: {order_id}")
                 raise ValueError(f"Không tìm thấy đơn hàng với ID {order_id}")
             
+            current_app.logger.info(f"Successfully retrieved order {order_id}")
             return order
         except ValueError as e:
             # Truyền tiếp ngoại lệ ValueError
+            current_app.logger.error(f"ValueError in get_order_by_id: {str(e)}")
             raise e
         except Exception as e:
             # Ghi log và đóng gói ngoại lệ
-            current_app.logger.error(f"Error getting order {order_id}: {str(e)}")
+            current_app.logger.error(f"Unexpected error getting order {order_id}: {str(e)}")
             current_app.logger.error(traceback.format_exc())
             db.session.rollback()
             raise ValueError(f"Lỗi khi tìm đơn hàng: {str(e)}")

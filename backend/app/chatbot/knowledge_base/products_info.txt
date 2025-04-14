@@ -1,0 +1,9 @@
+--- PRODUCT ---
+Thông tin sản phẩm ID: 19
+Tên sản phẩm: Áo Polo Can
+Mô tả: Không có mô tả
+Giá: 500000.0 VNĐ
+Giá khuyến mãi: 420000.0 VNĐ
+Danh mục: Áo polo
+Chất liệu: N/A
+Số lượng tồn kho: 15

@@ -24,9 +24,17 @@ const PaymentPage = () => {
         if (orderData) {
           setOrder(orderData);
           
-          // Nếu đơn hàng đã thanh toán, chuyển hướng đến trang thành công
-          if (orderData.payment_status === 'paid') {
+          // Nếu thanh toán là COD, chuyển hướng đến trang thành công
+          if (orderData.payment_method === 'cod') {
             navigate(`/order-success/${id}`);
+            return;
+          }
+          
+          // Nếu là VNPay và đơn hàng đã thanh toán, chuyển hướng đến trang xác nhận thanh toán
+          if (orderData.payment_method === 'vnpay' && orderData.payment_status === 'paid') {
+            // Redirect đến trang kết quả thanh toán thành công
+            navigate(`/payment/success?order_id=${id}`);
+            return;
           }
         } else {
           setError('Không tìm thấy thông tin đơn hàng');
@@ -52,6 +60,14 @@ const PaymentPage = () => {
       
       if (paymentResponse && paymentResponse.payment_url) {
         console.log('Redirecting to payment URL:', paymentResponse.payment_url);
+        
+        // Lưu danh sách các sản phẩm đã chọn vào localStorage để xử lý sau khi thanh toán thành công
+        // (Nếu chưa được lưu từ CheckoutPage)
+        if (!localStorage.getItem('vnpay_pending_order')) {
+          localStorage.setItem('vnpay_pending_order', id);
+          localStorage.setItem('vnpay_payment_timestamp', new Date().getTime().toString());
+        }
+        
         // Use timeout to ensure the UI updates before redirecting
         setTimeout(() => {
           window.location.href = paymentResponse.payment_url;
@@ -154,4 +170,4 @@ const PaymentPage = () => {
   );
 };
 
-export default PaymentPage; 
+export default PaymentPage;

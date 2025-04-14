@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Modal, Button } from 'react-bootstrap';
 import api from '../../services/api';
+import { formatImageUrl } from '../../utils/imageUtils';
 
 const OrderDetail = () => {
   const { id } = useParams();
@@ -86,6 +87,43 @@ const OrderDetail = () => {
     return (
       <span className={`badge ${statusObj?.class || 'bg-secondary'}`}>
         {statusObj?.label || 'Không xác định'}
+      </span>
+    );
+  };
+  
+  const getPaymentMethodText = (method) => {
+    switch (method) {
+      case 'cod':
+        return 'Thanh toán khi nhận hàng (COD)';
+      case 'vnpay':
+        return 'VNPay';
+      default:
+        return method || 'Không xác định';
+    }
+  };
+  
+  const getPaymentStatusBadge = (status) => {
+    let badgeClass = 'bg-secondary';
+    let statusText = 'Không xác định';
+    
+    switch (status) {
+      case 'pending':
+        badgeClass = 'bg-warning';
+        statusText = 'Chờ thanh toán';
+        break;
+      case 'paid':
+        badgeClass = 'bg-success';
+        statusText = 'Đã thanh toán';
+        break;
+      case 'failed':
+        badgeClass = 'bg-danger';
+        statusText = 'Thanh toán thất bại';
+        break;
+    }
+    
+    return (
+      <span className={`badge ${badgeClass}`}>
+        {statusText}
       </span>
     );
   };
@@ -221,6 +259,14 @@ const OrderDetail = () => {
                     )}
                   </div>
                 </div>
+                <div className="row mb-3">
+                  <div className="col-md-6">
+                    <p className="mb-1"><strong>Phương thức thanh toán:</strong> {getPaymentMethodText(order.payment_method)}</p>
+                  </div>
+                  <div className="col-md-6">
+                    <p className="mb-1"><strong>Trạng thái thanh toán:</strong> {getPaymentStatusBadge(order.payment_status)}</p>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -245,14 +291,14 @@ const OrderDetail = () => {
                           <td>
                             <div className="d-flex align-items-center">
                               <img
-                                src={item.product_image || '/placeholder.png'}
-                                alt={item.product_name}
+                                src={formatImageUrl(item.product?.image_url) || '/placeholder.png'}
+                                alt={item.product?.name}
                                 width="50"
                                 height="50"
                                 className="img-thumbnail me-2"
                               />
                               <div>
-                                <div>{item.product_name}</div>
+                                <div>{item.product?.name}</div>
                                 <small className="text-muted">ID: {item.product_id}</small>
                               </div>
                             </div>
@@ -327,4 +373,4 @@ const OrderDetail = () => {
   );
 };
 
-export default OrderDetail; 
+export default OrderDetail;

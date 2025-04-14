@@ -77,7 +77,20 @@ def get_all_products():
     
     # Apply filters if provided
     if search_term:
-        query = query.filter(Product.name.ilike(f'%{search_term}%'))
+        # Đơn giản hóa logic tìm kiếm - chỉ tìm trong tên sản phẩm
+        search_terms = search_term.strip().lower().split()
+        if search_terms:
+            # Tạo điều kiện tìm kiếm cho mỗi từ khóa
+            search_filter = Product.name.ilike(f'%{search_term}%')
+            # Nếu có nhiều từ khóa, thêm điều kiện OR cho mỗi từ
+            if len(search_terms) > 1:
+                from sqlalchemy import or_
+                for term in search_terms:
+                    if len(term) > 2:  # Bỏ qua các từ quá ngắn
+                        search_filter = or_(search_filter, Product.name.ilike(f'%{term}%'))
+            # Áp dụng bộ lọc
+            query = query.filter(search_filter)
+            current_app.logger.info(f"Admin searching for terms: {search_terms}")
     
     if category_id and category_id.isdigit():
         category_id = int(category_id)
@@ -420,12 +433,24 @@ def get_dashboard_stats():
             current_app.logger.error(f"Error getting orders by status: {e}")
             pending_orders = processing_orders = shipped_orders = delivered_orders = cancelled_orders = 0
         
-        # Tổng doanh thu (từ các đơn hàng đã giao)
+        # Tổng doanh thu (từ các đơn hàng đã giao hoặc đã thanh toán)
         try:
-            revenue = db.session.query(db.func.sum(Order.total_amount))\
+            # Tính tổng từ các đơn hàng đã giao
+            delivered_revenue = db.session.query(db.func.sum(Order.total_amount))\
                 .filter(Order.status == "delivered")\
                 .scalar() or 0
-            current_app.logger.debug(f"Total revenue: {revenue}")
+                
+            # Tính tổng từ các đơn hàng đã thanh toán nhưng chưa giao
+            paid_revenue = db.session.query(db.func.sum(Order.total_amount))\
+                .filter(Order.payment_status == "paid")\
+                .filter(Order.status != "delivered")\
+                .filter(Order.status != "cancelled")\
+                .scalar() or 0
+                
+            # Tổng doanh thu
+            revenue = delivered_revenue + paid_revenue
+            
+            current_app.logger.info(f"Total revenue: {revenue} (Delivered: {delivered_revenue}, Paid not delivered: {paid_revenue})")
         except Exception as e:
             current_app.logger.error(f"Error calculating revenue: {e}")
             revenue = 0
@@ -539,4 +564,4 @@ def update_user_admin_status(id):
     return jsonify({
         'message': f"User {user.email} admin status updated to {is_admin}",
         'user': user.to_dict()
-    }), 200 
+    }), 200

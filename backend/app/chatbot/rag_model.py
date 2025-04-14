@@ -169,7 +169,7 @@ class RAGChatbot:
                 # Make sure parent directory exists
                 os.makedirs(os.path.dirname(full_path), exist_ok=True)
                 logger.info(f"Saving vector store to {full_path}")
-                vectorstore.save_local("app/vector_store")
+                vectorstore.save_local("app/chatbot/vector_store")
                 logger.info(f"Vector store saved to {FAISS_INDEX_PATH}")
             except Exception as e:
                 logger.error(f"Failed to save vector store: {e}")

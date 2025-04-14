@@ -20,6 +20,7 @@ const ProductDetailPage = React.lazy(() => import('./pages/ProductDetailPage'));
 const CartPage = React.lazy(() => import('./pages/CartPage'));
 const CheckoutPage = React.lazy(() => import('./pages/CheckoutPage'));
 const PaymentPage = React.lazy(() => import('./pages/PaymentPage'));
+const PaymentResultPage = React.lazy(() => import('./pages/PaymentResultPage'));
 const OrderSuccessPage = React.lazy(() => import('./pages/OrderSuccessPage'));
 const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 const RegisterPage = React.lazy(() => import('./pages/RegisterPage'));
@@ -60,6 +61,9 @@ const App = () => {
         <Route path="products/:id" element={<ProductDetailPage />} />
         <Route path="cart" element={<CartPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
+        {/* Payment routes - specific routes should come before dynamic routes */}
+        <Route path="payment/success" element={<PaymentResultPage />} />
+        <Route path="payment/error" element={<PaymentResultPage />} />
         <Route path="payment/:id" element={<PaymentPage />} />
         <Route path="order-success/:id" element={<OrderSuccessPage />} />
         <Route path="login" element={<LoginPage />} />

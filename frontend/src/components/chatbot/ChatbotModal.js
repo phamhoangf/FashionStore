@@ -10,28 +10,16 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 const ChatbotModal = ({ show, onHide }) => {
   // Khởi tạo với tin nhắn chào mừng hoặc load từ localStorage
   const [messages, setMessages] = useState(() => {
-    const savedMessages = localStorage.getItem('chatbot_messages');
-    if (savedMessages) {
-      try {
-        const parsedMessages = JSON.parse(savedMessages);
-        // Đảm bảo ngày tháng được chuyển đổi đúng định dạng
-        return parsedMessages.map(msg => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }));
-      } catch (e) {
-        console.error('Error parsing saved messages:', e);
-        return getDefaultWelcomeMessage();
-      }
-    } else {
-      return getDefaultWelcomeMessage();
-    }
+    // Không sử dụng localStorage ngay tại thời điểm này
+    // Sẽ xử lý ở useEffect để đảm bảo có thể xác định người dùng hiện tại
+    return getDefaultWelcomeMessage();
   });
   
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  const [chatSessionId, setChatSessionId] = useState('');
 
   // Hàm trả về tin nhắn chào mừng mặc định
   function getDefaultWelcomeMessage() {
@@ -42,6 +30,38 @@ const ChatbotModal = ({ show, onHide }) => {
     }];
   }
 
+  // Tạo hoặc cập nhật ID phiên chat dựa trên token người dùng hoặc ID phiên
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const sessionId = localStorage.getItem('sessionId') || Date.now().toString();
+    
+    if (!localStorage.getItem('sessionId')) {
+      localStorage.setItem('sessionId', sessionId);
+    }
+    
+    // Tạo ID phiên chat dựa trên token hoặc sessionId
+    const chatId = token ? `chat_${token.substring(0, 10)}` : `chat_${sessionId}`;
+    setChatSessionId(chatId);
+    
+    // Tải tin nhắn từ localStorage dựa trên ID phiên chat
+    const savedMessages = localStorage.getItem(chatId);
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages);
+        // Đảm bảo ngày tháng được chuyển đổi đúng định dạng
+        setMessages(parsedMessages.map(msg => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        })));
+      } catch (e) {
+        console.error('Error parsing saved messages:', e);
+        setMessages(getDefaultWelcomeMessage());
+      }
+    } else {
+      setMessages(getDefaultWelcomeMessage());
+    }
+  }, []);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
@@ -49,23 +69,45 @@ const ChatbotModal = ({ show, onHide }) => {
 
   // Lưu tin nhắn vào localStorage khi có thay đổi
   useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem('chatbot_messages', JSON.stringify(messages));
+    if (messages.length > 0 && chatSessionId) {
+      localStorage.setItem(chatSessionId, JSON.stringify(messages));
     }
-  }, [messages]);
+  }, [messages, chatSessionId]);
 
   // Lắng nghe sự kiện đăng xuất để reset chat
   useEffect(() => {
     const resetChatOnLogout = () => {
       console.log('Resetting chatbot messages due to logout');
       setMessages(getDefaultWelcomeMessage());
-      localStorage.removeItem('chatbot_messages');
+      
+      // Xóa tất cả các phiên chat trong localStorage
+      // Nhưng giữ lại sessionId
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('chat_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    };
+
+    // Sự kiện khi đăng nhập thành công
+    const resetChatOnLogin = () => {
+      console.log('Resetting chatbot messages due to login');
+      setMessages(getDefaultWelcomeMessage());
+      
+      // Cập nhật chatSessionId dựa trên token mới
+      const token = localStorage.getItem('token');
+      if (token) {
+        const newChatId = `chat_${token.substring(0, 10)}`;
+        setChatSessionId(newChatId);
+      }
     };
 
     window.addEventListener('user-logout', resetChatOnLogout);
+    window.addEventListener('user-login', resetChatOnLogin);
     
     return () => {
       window.removeEventListener('user-logout', resetChatOnLogout);
+      window.removeEventListener('user-login', resetChatOnLogin);
     };
   }, []);
 
@@ -234,4 +276,4 @@ const ChatbotModal = ({ show, onHide }) => {
   );
 };
 
-export default ChatbotModal; 
+export default ChatbotModal;

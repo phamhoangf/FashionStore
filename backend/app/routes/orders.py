@@ -36,6 +36,9 @@ def get_order(id):
     user_id = get_jwt_identity()
     
     try:
+        # Ghi log thông tin yêu cầu
+        current_app.logger.info(f"User {user_id} requesting order details for ID: {id}")
+        
         # Lấy thông tin đơn hàng
         order = OrderService.get_order_by_id(id)
         
@@ -57,8 +60,8 @@ def get_order(id):
         current_app.logger.error(f"Error retrieving order {id}: {str(e)}")
         return jsonify({"error": str(e)}), 404
     except Exception as e:
-        current_app.logger.error(f"Unexpected error retrieving order {id}: {str(e)}")
-        return jsonify({"error": f"Không thể tải thông tin đơn hàng: {str(e)}"}), 500
+        current_app.logger.error(f"Unexpected error retrieving order {id}: {str(e)}", exc_info=True)
+        return jsonify({"error": "Không thể tải thông tin đơn hàng. Vui lòng thử lại sau."}), 500
 
 @bp.route('', methods=['POST'])
 @jwt_required()
@@ -214,3 +217,32 @@ def admin_update_order_status(id):
     except Exception as e:
         current_app.logger.error(f"Error updating order {id} status: {e}")
         return jsonify({"error": "Lỗi server khi cập nhật trạng thái đơn hàng"}), 500
+
+@bp.route('/<int:id>/payment-status', methods=['GET'])
+def get_order_payment_status(id):
+    """
+    Public endpoint để lấy trạng thái thanh toán của đơn hàng sau khi thanh toán VNPay
+    Endpoint này không yêu cầu xác thực JWT để phục vụ luồng redirect từ VNPay
+    """
+    try:
+        # Log request
+        current_app.logger.info(f"Getting payment status for order {id} (public endpoint)")
+        
+        # Lấy thông tin đơn hàng - chỉ trả về thông tin trạng thái thanh toán
+        order = OrderService.get_order_by_id(id)
+        
+        # Trả về thông tin thanh toán cơ bản
+        return jsonify({
+            "order_id": order.id,
+            "payment_status": order.payment_status,
+            "transaction_id": order.transaction_id,
+            "total_amount": order.total_amount,
+            "order_date": order.created_at.isoformat() if order.created_at else None,
+            "payment_method": order.payment_method
+        }), 200
+    except ValueError as e:
+        current_app.logger.error(f"Error retrieving payment status for order {id}: {str(e)}")
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error retrieving payment status for order {id}: {str(e)}", exc_info=True)
+        return jsonify({"error": "Không thể tải thông tin thanh toán. Vui lòng thử lại sau."}), 500

@@ -218,29 +218,12 @@ const CheckoutPage = () => {
           const paymentResponse = await payWithVNPay(order.id);
           console.log('Payment response:', paymentResponse);
           if (paymentResponse && paymentResponse.payment_url) {
-            // Xóa các sản phẩm đã chọn khỏi giỏ hàng
-            await removeSelectedItems(selectedItems, true);
+            // Lưu danh sách các sản phẩm đã chọn và order ID vào localStorage để xử lý sau khi thanh toán thành công
+            localStorage.setItem('vnpay_pending_order', order.id);
+            localStorage.setItem('vnpay_pending_items', JSON.stringify(selectedItems));
+            localStorage.setItem('vnpay_payment_timestamp', new Date().getTime().toString());
             
-            // Clear selectedItems from localStorage
-            localStorage.removeItem('selectedCartItems');
-            
-            // Force immediate visual update of the cart badge
-            try {
-              const cartBadges = document.querySelectorAll('.position-absolute.badge');
-              cartBadges.forEach(badge => {
-                if (badge.parentElement?.textContent.includes('Giỏ hàng')) {
-                  const newCount = Math.max(0, parseInt(badge.textContent || '0') - selectedItemsData.length);
-                  badge.textContent = newCount > 0 ? newCount.toString() : '';
-                  if (newCount === 0) {
-                    badge.style.display = 'none';
-                  }
-                }
-              });
-            } catch (domError) {
-              console.error('DOM update failed:', domError);
-            }
-            
-            console.log('Selected items removed from cart before VNPay redirect');
+            console.log('Saved pending VNPay order info to localStorage, redirecting to payment page');
             
             // Add a small delay before redirecting to VNPay page
             setTimeout(() => {
@@ -257,39 +240,23 @@ const CheckoutPage = () => {
         }
       } else {
         // Nếu thanh toán khi nhận hàng (COD), xóa sản phẩm đã chọn khỏi giỏ hàng và chuyển hướng đến trang thành công
-        console.log('Processing COD payment for order:', order.id);
-        
-        try {
-          // Xóa các sản phẩm đã chọn khỏi giỏ hàng
-          await removeSelectedItems(selectedItems, true);
+          console.log('Processing COD payment for order:', order.id);
           
-          // Clear selectedItems from localStorage
-          localStorage.removeItem('selectedCartItems');
-          
-          // Force immediate visual update of the cart badge
-          const cartBadges = document.querySelectorAll('.position-absolute.badge');
-          cartBadges.forEach(badge => {
-            if (badge.parentElement?.textContent.includes('Giỏ hàng')) {
-              const newCount = Math.max(0, parseInt(badge.textContent || '0') - selectedItemsData.length);
-              badge.textContent = newCount > 0 ? newCount.toString() : '';
-              if (newCount === 0) {
-                badge.style.display = 'none';
-              }
-            }
-          });
-          
-          console.log('Selected items removed from cart before redirecting to success page');
-          
-          // Add a small delay before navigation to ensure everything is processed
-          setTimeout(() => {
+          try {
+            // Xóa các sản phẩm đã chọn khỏi giỏ hàng - OrderSuccessPage sẽ xử lý việc này
+            // Lưu trữ danh sách sản phẩm được chọn để OrderSuccessPage xử lý
+            console.log('Preparing to navigate to order success page');
+            
+            // Add a small delay before navigation to ensure order is fully processed
+            setTimeout(() => {
+              navigate(`/order-success/${order.id}`);
+            }, 300); // 300ms delay should be enough
+            
+          } catch (clearError) {
+            console.error('Error during COD checkout:', clearError);
+            // Still navigate even if there was an error
             navigate(`/order-success/${order.id}`);
-          }, 300); // 300ms delay should be enough
-          
-        } catch (clearError) {
-          console.error('Error removing selected items from cart:', clearError);
-          // Still navigate even if there was an error clearing the cart
-          navigate(`/order-success/${order.id}`);
-        }
+          }
       }
     } catch (error) {
       console.error('Checkout error:', error);

@@ -21,6 +21,51 @@ export const CartProvider = ({ children }) => {
     product: null
   });
 
+  // Kiểm tra và xử lý các thanh toán VNPay bị hủy giữa chừng
+  useEffect(() => {
+    // Hàm kiểm tra thời gian timeout cho giao dịch VNPay
+    const checkAbandonedVNPayPayments = () => {
+      try {
+        // Kiểm tra xem có thông tin thanh toán VNPay đang chờ không
+        const pendingOrderId = localStorage.getItem('vnpay_pending_order');
+        const pendingItems = localStorage.getItem('vnpay_pending_items');
+        
+        if (pendingOrderId && pendingItems) {
+          const timestamp = localStorage.getItem('vnpay_payment_timestamp');
+          const currentTime = new Date().getTime();
+          
+          // Nếu không có timestamp, tạo một timestamp mới
+          if (!timestamp) {
+            localStorage.setItem('vnpay_payment_timestamp', currentTime.toString());
+          } else {
+            // Tính thời gian đã trôi qua (tính bằng phút)
+            const elapsedMinutes = (currentTime - parseInt(timestamp)) / (1000 * 60);
+            
+            // Nếu đã hơn 30 phút (hoặc thời gian phù hợp) mà chưa có kết quả,
+            // có thể coi là giao dịch đã bị hủy hoặc timeout
+            if (elapsedMinutes > 30) {
+              console.log('Phát hiện giao dịch VNPay bị hủy hoặc timeout sau 30 phút');
+              
+              // Xóa các thông tin thanh toán để không xóa sản phẩm khỏi giỏ hàng
+              localStorage.removeItem('vnpay_pending_order');
+              localStorage.removeItem('vnpay_pending_items');
+              localStorage.removeItem('vnpay_payment_timestamp');
+            }
+          }
+        } else if (!pendingOrderId && !pendingItems) {
+          // Nếu không có thông tin thanh toán, xóa timestamp nếu có
+          localStorage.removeItem('vnpay_payment_timestamp');
+        }
+      } catch (err) {
+        console.error('Error checking for abandoned VNPay payments:', err);
+      }
+    };
+    
+    // Chạy kiểm tra khi component được tải
+    checkAbandonedVNPayPayments();
+    
+  }, []);
+
   // Tính tổng tiền giỏ hàng
   const totalAmount = cart.total || 
     (cart.items ? cart.items.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0) : 0);

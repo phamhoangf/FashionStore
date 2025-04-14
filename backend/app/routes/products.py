@@ -56,16 +56,19 @@ def get_products():
         query = query.filter_by(featured=featured)
         
     if search:
-        # Chuẩn hóa chuỗi tìm kiếm
-        search = search.strip().lower()
-        # Tìm kiếm trong cả tên và mô tả sản phẩm
-        query = query.filter(
-            or_(
-                Product.name.ilike(f'%{search}%'),
-                Product.description.ilike(f'%{search}%')
-            )
-        )
-        current_app.logger.info(f"Searching for: '{search}'")
+        # Đơn giản hóa logic tìm kiếm
+        search_terms = search.strip().lower().split()
+        if search_terms:
+            # Tạo điều kiện tìm kiếm cho mỗi từ khóa (tìm kiếm AND)
+            search_filter = Product.name.ilike(f'%{search}%')
+            # Nếu có nhiều từ khóa, thêm điều kiện OR cho mỗi từ
+            if len(search_terms) > 1:
+                for term in search_terms:
+                    if len(term) > 2:  # Bỏ qua các từ quá ngắn
+                        search_filter = or_(search_filter, Product.name.ilike(f'%{term}%'))
+            # Áp dụng bộ lọc
+            query = query.filter(search_filter)
+            current_app.logger.info(f"Searching for terms: {search_terms}")
     
     # Apply sorting
     if sort == 'price_asc':

@@ -38,6 +38,8 @@ export const AuthProvider = ({ children }) => {
       if (response && response.user) {
         console.log('User info from login response:', response.user);
         setUser(response.user);
+        // Phát sự kiện đăng nhập thành công để các component khác biết
+        window.dispatchEvent(new CustomEvent('user-login'));
         return response;
       } else if (response && response.access_token) {
         // Nếu có access_token nhưng không có user, thử lấy thông tin user
@@ -46,6 +48,8 @@ export const AuthProvider = ({ children }) => {
           const userData = await checkAuthStatus();
           console.log('User info from checkAuthStatus:', userData);
           setUser(userData);
+          // Phát sự kiện đăng nhập thành công để các component khác biết
+          window.dispatchEvent(new CustomEvent('user-login'));
           return { ...response, user: userData };
         } catch (statusError) {
           console.error('Error getting user status after login:', statusError);

@@ -37,7 +37,7 @@ export const getOrderDetails = async (id) => {
     }
     
     console.log(`Requesting order details for ID: ${id}`);
-    const response = await api.get(`/orders/${id}`);
+        const response = await api.get(`/orders/${id}`);
     
     // Kiểm tra response
     if (!response || typeof response !== 'object') {
@@ -53,6 +53,13 @@ export const getOrderDetails = async (id) => {
     if (error.response) {
       console.error('Error response status:', error.response.status);
       console.error('Error response data:', error.response.data);
+      
+      // Xử lý lỗi 401/403 (Unauthorized/Forbidden)
+      if (error.response.status === 401 || error.response.status === 403) {
+        // Thử refresh token hoặc đưa ra thông báo cụ thể
+        console.error('Authentication error when fetching order details');
+        throw new Error('Vui lòng đăng nhập lại để xem thông tin đơn hàng');
+      }
     }
     throw error;
   }
@@ -127,4 +134,4 @@ export default {
   cancelOrder,
   createOrder,
   payWithVNPay
-}; 
+};

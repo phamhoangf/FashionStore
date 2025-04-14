@@ -17,7 +17,7 @@ Câu hỏi: Làm thế nào để áp dụng mã giảm giá?
 Trả lời: Để áp dụng mã giảm giá, bạn cần thêm sản phẩm vào giỏ hàng, sau đó chuyển đến trang thanh toán. Tại đây, bạn sẽ thấy ô "Mã giảm giá" - hãy nhập mã của bạn và nhấp vào "Áp dụng". Nếu mã hợp lệ, giảm giá sẽ được áp dụng ngay lập tức vào tổng thanh toán.
 
 Câu hỏi: Tôi có thể thanh toán bằng những phương thức nào?
-Trả lời: Chúng tôi chấp nhận nhiều phương thức thanh toán khác nhau bao gồm: thẻ tín dụng/ghi nợ (Visa, MasterCard, JCB), ví điện tử (Momo, VNPay, ZaloPay), chuyển khoản ngân hàng và thanh toán khi nhận hàng (COD). Bạn có thể chọn phương thức thanh toán phù hợp trong quá trình thanh toán.
+Trả lời: Chúng tôi chấp nhận nhiều phương thức thanh toán khác nhau bao gồm: thẻ tín dụng/ghi nợ (Visa, MasterCard, JCB), ví điện tử (VNPay), chuyển khoản ngân hàng và thanh toán khi nhận hàng (COD). Bạn có thể chọn phương thức thanh toán phù hợp trong quá trình thanh toán.
 
 Câu hỏi: Có cửa hàng thực tế không hay chỉ bán online?
 Trả lời: Chúng tôi có cả cửa hàng thực tế và nền tảng bán hàng online. Hiện tại, chúng tôi có 5 cửa hàng thực tế tại Hà Nội, TP. Hồ Chí Minh, Đà Nẵng, Hải Phòng và Cần Thơ. Bạn có thể tìm địa chỉ cụ thể của các cửa hàng trong mục "Hệ thống cửa hàng" trên trang web.

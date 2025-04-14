@@ -168,6 +168,17 @@ const OrderList = () => {
     const statusObj = statusOptions.find(s => s.value === status);
     return statusObj ? statusObj.label : 'Không xác định';
   };
+  
+  const getPaymentMethodText = (method) => {
+    switch (method) {
+      case 'cod':
+        return 'COD';
+      case 'vnpay':
+        return 'VNPay';
+      default:
+        return method || 'Không xác định';
+    }
+  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -275,6 +286,7 @@ const OrderList = () => {
                     <th>Khách hàng</th>
                     <th>Ngày đặt</th>
                     <th>Tổng tiền</th>
+                    <th>Phương thức</th>
                     <th>Trạng thái</th>
                     <th>Thao tác</th>
                   </tr>
@@ -290,6 +302,7 @@ const OrderList = () => {
                         </td>
                         <td>{formatDate(order.created_at)}</td>
                         <td>{formatCurrency(order.total_amount)}</td>
+                        <td>{getPaymentMethodText(order.payment_method)}</td>
                         <td>
                           <span className={`badge ${getStatusBadgeClass(order.status)}`}>
                             {getStatusText(order.status)}
@@ -405,4 +418,4 @@ const OrderList = () => {
   );
 };
 
-export default OrderList; 
+export default OrderList;

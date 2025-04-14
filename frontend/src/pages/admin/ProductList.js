@@ -140,6 +140,7 @@ const ProductList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // State mới để lưu giá trị đang nhập
   const [selectedCategory, setSelectedCategory] = useState('');
   const [useMockData, setUseMockData] = useState(false);
 
@@ -271,6 +272,7 @@ const ProductList = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    setSearchTerm(searchInput); // Chỉ cập nhật searchTerm khi submit form
     setCurrentPage(1); // Reset về trang 1 khi tìm kiếm
   };
 
@@ -310,6 +312,7 @@ const ProductList = () => {
 
   const handleReset = () => {
     setSearchTerm('');
+    setSearchInput('');
     setSelectedCategory('');
     setCurrentPage(1);
   };
@@ -358,8 +361,8 @@ const ProductList = () => {
                     type="text"
                     className="form-control"
                     placeholder="Tìm kiếm sản phẩm..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                   />
                   <button className="btn btn-outline-secondary" type="submit">
                     <i className="bi bi-search"></i>
@@ -505,4 +508,4 @@ const ProductList = () => {
   );
 };
 
-export default ProductList; 
+export default ProductList;
