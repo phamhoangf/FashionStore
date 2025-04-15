@@ -1,0 +1,126 @@
+/* Header Styles */
+.navbar {
+  border-bottom: 1px solid #eee;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.navbar-brand img {
+  transition: transform 0.3s ease;
+}
+
+.navbar-brand:hover img {
+  transform: scale(1.05);
+}
+
+/* Main categories styling */
+.navbar-nav .nav-item.category-dropdown {
+  position: relative;
+}
+
+.navbar-nav .nav-item.category-dropdown .nav-link {
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.navbar-nav .nav-item.category-dropdown .nav-link::after {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+.navbar-nav .nav-item.category-dropdown .nav-link:hover,
+.navbar-nav .nav-item.category-dropdown .nav-link:focus {
+  color: #0d6efd;
+}
+
+/* Dropdown menu styling */
+.navbar-nav .dropdown-menu {
+  border-radius: 0.25rem;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.5rem 0;
+  margin-top: 0;
+}
+
+.dropdown-menu {
+  max-height: 80vh;
+  overflow-y: auto;
+  min-width: 200px;
+}
+
+.dropdown-item {
+  padding: 0.5rem 1.5rem;
+  font-size: 0.875rem;
+  color: #333;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dropdown-item:hover, 
+.dropdown-item:focus {
+  background-color: #f1f5f9;
+  color: #0d6efd;
+}
+
+.dropdown-divider {
+  margin: 0.5rem 0;
+}
+
+/* Search box styling */
+.navbar .input-group {
+  width: 100%;
+  max-width: 300px;
+}
+
+/* Badge styling */
+.badge.bg-danger {
+  font-size: 0.65rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* Show dropdown on hover for desktop */
+@media (min-width: 992px) {
+  .navbar-nav .nav-item.category-dropdown:hover .dropdown-menu {
+    display: block;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+  .dropdown-menu {
+    width: 100%;
+    position: static !important;
+    margin-top: 0;
+    transform: none !important;
+    border: none;
+    box-shadow: none;
+  }
+  
+  .dropdown-menu {
+    max-height: none;
+    overflow-y: visible;
+  }
+  
+  .navbar .input-group {
+    max-width: 100%;
+    margin: 1rem 0;
+  }
+  
+  .navbar-nav .nav-item.category-dropdown .nav-link {
+    padding: 0.5rem 0;
+  }
+}
+
+.dropdown-item.view-all {
+  font-weight: 500;
+  color: #0d6efd;
+  border-bottom: 1px solid #f1f1f9;
+}
+
+.dropdown-item.view-all:hover,
+.dropdown-item.view-all:focus {
+  background-color: #f1f5f9;
+}

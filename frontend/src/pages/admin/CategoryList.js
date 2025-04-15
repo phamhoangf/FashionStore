@@ -22,12 +22,60 @@ const CategoryList = () => {
     try {
       setLoading(true);
       const response = await api.get('/admin/categories');
-      setCategories(response || []);
+      
+      if (response && Array.isArray(response)) {
+        console.log('Categories fetched:', response);
+        
+        // Xử lý danh mục nếu cần
+        // Ví dụ: Nếu API đã trả về "Quần" thì đổi thành "Quần nam"
+        const processedCategories = response.map(cat => {
+          if (cat.name === 'Quần' && !cat.parent_id) {
+            return { ...cat, name: 'Quần nam' };
+          }
+          if (cat.name === 'Áo' && !cat.parent_id) {
+            return { ...cat, name: 'Áo nam' };
+          }
+          return cat;
+        });
+        
+        setCategories(processedCategories || []);
+      } else {
+        console.error('Invalid response format:', response);
+        setCategories([]);
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching categories:', error);
       setError('Không thể tải danh mục sản phẩm');
       setLoading(false);
+      
+      // Dữ liệu mẫu khi có lỗi
+      const fallbackCategories = [
+        { 
+          id: 2, 
+          name: 'Quần nam', 
+          description: 'Quần nam các loại',
+          parent_id: null
+        },
+        { 
+          id: 3, 
+          name: 'Áo nam', 
+          description: 'Áo nam các loại',
+          parent_id: null
+        },
+        { id: 5, name: 'Quần short', description: 'Quần short nam', parent_id: 2 },
+        { id: 6, name: 'Quần jeans', description: 'Quần jeans nam', parent_id: 2 },
+        { id: 7, name: 'Quần âu', description: 'Quần âu nam', parent_id: 2 },
+        { id: 8, name: 'Quần kaki', description: 'Quần kaki nam dài', parent_id: 2 },
+        { id: 9, name: 'Áo thun', description: 'Áo thun nam', parent_id: 3 },
+        { id: 10, name: 'Áo polo', description: 'Áo polo nam', parent_id: 3 },
+        { id: 11, name: 'Áo sơ mi', description: 'Áo sơ mi nam', parent_id: 3 },
+        { id: 12, name: 'Áo khoác', description: 'Áo khoác nam', parent_id: 3 },
+        { id: 13, name: 'Áo len', description: 'Áo len nam', parent_id: 3 }
+      ];
+      
+      setCategories(fallbackCategories);
     }
   };
 

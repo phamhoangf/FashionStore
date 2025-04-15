@@ -1,0 +1,44 @@
+Câu hỏi: Làm thế nào để tạo tài khoản mới?
+Trả lời: Để tạo tài khoản mới, bạn có thể nhấn vào nút "Đăng ký" ở góc phải trên cùng của trang web. Sau đó, điền đầy đủ thông tin bao gồm tên, email, mật khẩu và các thông tin khác theo yêu cầu. Nhấn "Đăng ký" để hoàn tất.
+
+Câu hỏi: Tôi quên mật khẩu, phải làm sao?
+Trả lời: Nếu bạn quên mật khẩu, hãy nhấn vào liên kết "Quên mật khẩu" trên trang đăng nhập. Nhập email đăng ký của bạn, chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu qua email.
+
+Câu hỏi: Làm thế nào để thay đổi thông tin cá nhân?
+Trả lời: Sau khi đăng nhập, bạn có thể vào trang "Hồ sơ" hoặc "Tài khoản" để cập nhật thông tin cá nhân, bao gồm tên, địa chỉ, số điện thoại và các thông tin khác.
+
+Câu hỏi: Cách theo dõi đơn hàng của tôi?
+Trả lời: Bạn có thể theo dõi đơn hàng bằng cách đăng nhập vào tài khoản, sau đó vào mục "Đơn hàng" hoặc "Lịch sử đơn hàng". Tại đây, bạn sẽ thấy trạng thái hiện tại của tất cả các đơn hàng của mình.
+
+Câu hỏi: Các phương thức thanh toán được chấp nhận?
+Trả lời: Chúng tôi chấp nhận nhiều phương thức thanh toán bao gồm: Thanh toán khi nhận hàng (COD), thanh toán qua VNPay, và các hình thức chuyển khoản ngân hàng khác.
+
+Câu hỏi: Thời gian giao hàng là bao lâu?
+Trả lời: Thời gian giao hàng thông thường là 2-5 ngày làm việc tùy thuộc vào khu vực. Đối với các khu vực nội thành lớn, thời gian có thể nhanh hơn, khoảng 1-2 ngày.
+
+Câu hỏi: Chính sách đổi trả hàng như thế nào?
+Trả lời: Bạn có thể đổi trả sản phẩm trong vòng 30 ngày kể từ ngày nhận hàng nếu sản phẩm còn nguyên vẹn, chưa qua sử dụng và còn đầy đủ bao bì, nhãn mác. Vui lòng liên hệ với bộ phận Chăm sóc Khách hàng để được hướng dẫn quy trình đổi trả.
+
+Câu hỏi: Làm thế nào để tôi biết size quần áo phù hợp?
+Trả lời: Trong trang chi tiết sản phẩm, chúng tôi có bảng kích thước (size chart) để bạn tham khảo. Bạn có thể đo các số đo cơ thể và đối chiếu với bảng này để chọn size phù hợp nhất.
+
+Câu hỏi: Tôi có thể hủy đơn hàng không?
+Trả lời: Bạn có thể hủy đơn hàng nếu đơn hàng chưa được xử lý hoặc vận chuyển. Để hủy đơn hàng, vui lòng vào mục "Đơn hàng" trong tài khoản của bạn và nhấn vào nút "Hủy đơn hàng" nếu tùy chọn này còn hiển thị.
+
+Câu hỏi: Tôi cần liên hệ với bộ phận hỗ trợ bằng cách nào?
+Trả lời: Bạn có thể liên hệ với bộ phận hỗ trợ qua email support@example.com, số điện thoại 1900-1234, hoặc qua form liên hệ trên trang web của chúng tôi.
+
+Câu hỏi: Làm thế nào để áp dụng mã giảm giá?
+Trả lời: Trong trang giỏ hàng hoặc trang thanh toán, bạn sẽ thấy ô "Mã giảm giá" hoặc "Coupon". Nhập mã giảm giá của bạn vào ô này và nhấn "Áp dụng" để được giảm giá.
+
+Câu hỏi: Cửa hàng có cung cấp dịch vụ gói quà không?
+Trả lời: Có, chúng tôi có dịch vụ gói quà. Khi thanh toán, bạn có thể chọn tùy chọn "Gói quà" và có thể thêm lời nhắn nếu món quà dành tặng người thân hoặc bạn bè.
+
+Câu hỏi: Tôi có phải trả phí vận chuyển không?
+Trả lời: Phí vận chuyển sẽ được tính dựa trên khoảng cách và trọng lượng đơn hàng. Đơn hàng có giá trị từ 500.000 VNĐ trở lên sẽ được miễn phí vận chuyển.
+
+Câu hỏi: Làm thế nào để thêm sản phẩm vào giỏ hàng?
+Trả lời: Trên trang chi tiết sản phẩm, sau khi chọn kích thước và số lượng, bạn nhấn vào nút "Thêm vào giỏ hàng". Sản phẩm sẽ được thêm vào giỏ hàng của bạn và bạn có thể tiếp tục mua sắm hoặc tiến hành thanh toán.
+
+Câu hỏi: Có thể mua hàng không cần đăng ký tài khoản không?
+Trả lời: Có, bạn có thể mua hàng mà không cần đăng ký tài khoản. Tuy nhiên, việc đăng ký tài khoản sẽ giúp bạn theo dõi đơn hàng, lưu địa chỉ giao hàng và nhận được các khuyến mãi đặc biệt. 

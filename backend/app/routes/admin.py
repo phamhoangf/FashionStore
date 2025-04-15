@@ -77,7 +77,20 @@ def get_all_products():
     
     # Apply filters if provided
     if search_term:
-        query = query.filter(Product.name.ilike(f'%{search_term}%'))
+        # Đơn giản hóa logic tìm kiếm - chỉ tìm trong tên sản phẩm
+        search_terms = search_term.strip().lower().split()
+        if search_terms:
+            # Tạo điều kiện tìm kiếm cho mỗi từ khóa
+            search_filter = Product.name.ilike(f'%{search_term}%')
+            # Nếu có nhiều từ khóa, thêm điều kiện OR cho mỗi từ
+            if len(search_terms) > 1:
+                from sqlalchemy import or_
+                for term in search_terms:
+                    if len(term) > 2:  # Bỏ qua các từ quá ngắn
+                        search_filter = or_(search_filter, Product.name.ilike(f'%{term}%'))
+            # Áp dụng bộ lọc
+            query = query.filter(search_filter)
+            current_app.logger.info(f"Admin searching for terms: {search_terms}")
     
     if category_id and category_id.isdigit():
         category_id = int(category_id)
@@ -110,26 +123,37 @@ def get_all_products():
 @jwt_required()
 @admin_required
 def create_product():
-    # Lấy dữ liệu từ form
-    name = request.form.get('name')
-    description = request.form.get('description')
-    price = request.form.get('price', type=float)
-    discount_price = request.form.get('discount_price', type=float)
-    stock = request.form.get('stock', type=int)
-    category_id = request.form.get('category_id', type=int)
-    featured = request.form.get('featured', '').lower() == 'true'
-    
-    # Kiểm tra dữ liệu
-    if not name or not price or not category_id:
-        return jsonify({'error': 'Thông tin không đầy đủ'}), 400
-    
-    # Xử lý file ảnh
-    image_file = None
-    if 'image' in request.files:
-        image_file = request.files['image']
-    
-    # Tạo sản phẩm mới
     try:
+        # Lấy dữ liệu từ form
+        name = request.form.get('name')
+        description = request.form.get('description')
+        price = request.form.get('price', type=float)
+        discount_price = request.form.get('discount_price', type=float)
+        stock = request.form.get('stock', type=int)
+        category_id = request.form.get('category_id', type=int)
+        featured = request.form.get('featured', '').lower() == 'true'
+        
+        # Log thông tin form
+        current_app.logger.info(f"Create product form data: {dict(request.form)}")
+        
+        # Kiểm tra dữ liệu
+        if not name or not price or not category_id:
+            return jsonify({'error': 'Thông tin không đầy đủ'}), 400
+        
+        # Xử lý file ảnh
+        image_file = None
+        if 'image' in request.files:
+            image_file = request.files['image']
+            current_app.logger.info(f"Image file received: {image_file.filename if image_file else 'None'}")
+            
+            # Kiểm tra xem file có rỗng không
+            if image_file.filename == '':
+                current_app.logger.warning("Empty image filename")
+                image_file = None
+        else:
+            current_app.logger.info("No image file in request")
+        
+        # Tạo sản phẩm mới
         product = ProductService.create_product(
             name=name,
             description=description,
@@ -142,6 +166,7 @@ def create_product():
         )
         return jsonify(product.to_dict()), 201
     except Exception as e:
+        current_app.logger.error(f"Error creating product: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @bp.route('/products/<int:id>', methods=['GET'])
@@ -158,36 +183,46 @@ def get_product(id):
 @jwt_required()
 @admin_required
 def update_product(id):
-    # Lấy dữ liệu từ form
-    data = {}
-    
-    if 'name' in request.form:
-        data['name'] = request.form.get('name')
-    if 'description' in request.form:
-        data['description'] = request.form.get('description')
-    if 'price' in request.form:
-        data['price'] = float(request.form.get('price'))
-    if 'discount_price' in request.form:
-        data['discount_price'] = float(request.form.get('discount_price')) if request.form.get('discount_price') else None
-    if 'stock' in request.form:
-        data['stock'] = int(request.form.get('stock'))
-    if 'category_id' in request.form:
-        data['category_id'] = int(request.form.get('category_id'))
-    if 'featured' in request.form:
-        data['featured'] = request.form.get('featured', '').lower() == 'true'
-    
-    # Xử lý file ảnh
-    image_file = None
-    if 'image' in request.files:
-        image_file = request.files['image']
-        if image_file.filename == '':
-            image_file = None
-    
-    # Cập nhật sản phẩm
     try:
+        # Log thông tin request
+        current_app.logger.info(f"Update product {id} - Form data: {dict(request.form)}")
+        current_app.logger.info(f"Update product {id} - Files: {request.files.keys() if request.files else 'No files'}")
+        
+        # Lấy dữ liệu từ form
+        data = {}
+        
+        if 'name' in request.form:
+            data['name'] = request.form.get('name')
+        if 'description' in request.form:
+            data['description'] = request.form.get('description')
+        if 'price' in request.form:
+            data['price'] = float(request.form.get('price'))
+        if 'discount_price' in request.form:
+            data['discount_price'] = float(request.form.get('discount_price')) if request.form.get('discount_price') else None
+        if 'stock' in request.form:
+            data['stock'] = int(request.form.get('stock'))
+        if 'category_id' in request.form:
+            data['category_id'] = int(request.form.get('category_id'))
+        if 'featured' in request.form:
+            data['featured'] = request.form.get('featured', '').lower() == 'true'
+        
+        # Xử lý file ảnh
+        image_file = None
+        if 'image' in request.files:
+            image_file = request.files['image']
+            current_app.logger.info(f"Image file received: {image_file.filename if image_file else 'None'}")
+            
+            if image_file.filename == '':
+                current_app.logger.warning("Empty image filename")
+                image_file = None
+        else:
+            current_app.logger.info("No image file in request")
+        
+        # Cập nhật sản phẩm
         product = ProductService.update_product(id, data, image_file)
         return jsonify(product.to_dict()), 200
     except Exception as e:
+        current_app.logger.error(f"Error updating product {id}: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @bp.route('/products/<int:id>', methods=['DELETE'])
@@ -309,10 +344,12 @@ def get_all_orders():
 def get_order(id):
     try:
         order = OrderService.get_order_by_id(id)
+        if not order:
+            return jsonify({"error": f"Không tìm thấy đơn hàng ID: {id}"}), 404
         return jsonify(order.to_dict(include_items=True)), 200
     except Exception as e:
         current_app.logger.error(f"Error getting order {id}: {e}")
-        return jsonify({"error": str(e)}), 404
+        return jsonify({"error": f"Không thể tải thông tin đơn hàng: {str(e)}"}), 404
 
 @bp.route('/orders/<int:id>/status', methods=['PUT'])
 @jwt_required()
@@ -324,10 +361,18 @@ def update_order_status(id):
         return jsonify({"error": "Trạng thái đơn hàng là bắt buộc"}), 400
     
     try:
+        current_app.logger.info(f"Updating order {id} status to: {data['status']}")
         order = OrderService.update_order_status(id, data['status'])
-        return jsonify(order.to_dict()), 200
-    except Exception as e:
+        current_app.logger.info(f"Successfully updated order {id}")
+        return jsonify(order.to_dict(include_items=True)), 200
+    except ValueError as e:
+        current_app.logger.error(f"Value error updating order {id} status: {str(e)}")
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error updating order {id} status: {str(e)}")
+        import traceback
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({"error": "Lỗi server khi cập nhật trạng thái đơn hàng"}), 500
 
 # Thống kê
 @bp.route('/dashboard', methods=['GET'])
@@ -358,7 +403,7 @@ def get_dashboard_stats():
                 'error': 'Không có quyền admin',
                 'message': 'Admin privileges required'
             }), 403
-        
+            
         current_app.logger.info(f"User {user_id} ({user.email}) is admin, proceeding with dashboard data")
         
         # Tổng số sản phẩm
@@ -388,12 +433,24 @@ def get_dashboard_stats():
             current_app.logger.error(f"Error getting orders by status: {e}")
             pending_orders = processing_orders = shipped_orders = delivered_orders = cancelled_orders = 0
         
-        # Tổng doanh thu (từ các đơn hàng đã giao)
+        # Tổng doanh thu (từ các đơn hàng đã giao hoặc đã thanh toán)
         try:
-            revenue = db.session.query(db.func.sum(Order.total_amount))\
+            # Tính tổng từ các đơn hàng đã giao
+            delivered_revenue = db.session.query(db.func.sum(Order.total_amount))\
                 .filter(Order.status == "delivered")\
                 .scalar() or 0
-            current_app.logger.debug(f"Total revenue: {revenue}")
+                
+            # Tính tổng từ các đơn hàng đã thanh toán nhưng chưa giao
+            paid_revenue = db.session.query(db.func.sum(Order.total_amount))\
+                .filter(Order.payment_status == "paid")\
+                .filter(Order.status != "delivered")\
+                .filter(Order.status != "cancelled")\
+                .scalar() or 0
+                
+            # Tổng doanh thu
+            revenue = delivered_revenue + paid_revenue
+            
+            current_app.logger.info(f"Total revenue: {revenue} (Delivered: {delivered_revenue}, Paid not delivered: {paid_revenue})")
         except Exception as e:
             current_app.logger.error(f"Error calculating revenue: {e}")
             revenue = 0
@@ -404,9 +461,20 @@ def get_dashboard_stats():
             recent_orders_data = []
             for order in recent_orders:
                 try:
+                    # Get customer information from User model
+                    customer = User.query.get(order.user_id)
+                    customer_name = ''
+                    customer_phone = ''
+                    
+                    if customer:
+                        customer_name = customer.name
+                        customer_phone = customer.phone
+                    
                     order_dict = {
                         'id': order.id,
                         'user_id': order.user_id,
+                        'customer_name': customer_name,
+                        'customer_phone': customer_phone,
                         'status': order.status,
                         'total_amount': order.total_amount,
                         'created_at': order.created_at.isoformat() if order.created_at else None
@@ -507,4 +575,4 @@ def update_user_admin_status(id):
     return jsonify({
         'message': f"User {user.email} admin status updated to {is_admin}",
         'user': user.to_dict()
-    }), 200 
+    }), 200

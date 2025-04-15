@@ -73,53 +73,85 @@ def hmacsha512(key, data):
 
 def create_vnpay_payment(order_id, amount, order_desc, bank_code=None):
     """Create a VNPAY payment URL"""
-    vnp = {}
-    vnp['vnp_Version'] = '2.1.0'
-    vnp['vnp_Command'] = 'pay'
-    vnp['vnp_TmnCode'] = current_app.config['VNPAY_TMN_CODE']
-    vnp['vnp_Amount'] = int(amount * 100)  # Convert to smallest currency unit (e.g., cents)
-    vnp['vnp_CurrCode'] = 'VND'
-    if bank_code:
-        vnp['vnp_BankCode'] = bank_code
-    vnp['vnp_TxnRef'] = str(order_id)
-    vnp['vnp_OrderInfo'] = order_desc
-    vnp['vnp_OrderType'] = 'fashion'
-    vnp['vnp_Locale'] = 'vn'
-    vnp['vnp_ReturnUrl'] = current_app.config['VNPAY_RETURN_URL']
-    vnp['vnp_IpAddr'] = '127.0.0.1'  # In real implementation, get client IP
-    vnp['vnp_CreateDate'] = datetime.now().strftime('%Y%m%d%H%M%S')
-    
-    # Sort parameters by key before creating signature
-    input_data = sorted(vnp.items())
-    query = ''
-    for key, val in input_data:
-        if query != '':
-            query += '&' + key + '=' + urllib.parse.quote_plus(str(val))
-        else:
-            query = key + '=' + urllib.parse.quote_plus(str(val))
-    
-    # Create signature
-    vnp['vnp_SecureHash'] = hmacsha512(current_app.config['VNPAY_HASH_SECRET_KEY'], query)
-    
-    # Return the full VNPAY URL
-    payment_url = current_app.config['VNPAY_PAYMENT_URL'] + '?' + query + '&vnp_SecureHash=' + vnp['vnp_SecureHash']
-    return payment_url
+    try:
+        vnp = {}
+        vnp['vnp_Version'] = '2.1.0'
+        vnp['vnp_Command'] = 'pay'
+        vnp['vnp_TmnCode'] = current_app.config['VNPAY_TMN_CODE']
+        vnp['vnp_Amount'] = int(amount * 100)  # Convert to smallest currency unit (e.g., cents)
+        vnp['vnp_CurrCode'] = 'VND'
+        if bank_code:
+            vnp['vnp_BankCode'] = bank_code
+        vnp['vnp_TxnRef'] = str(order_id)
+        vnp['vnp_OrderInfo'] = order_desc
+        vnp['vnp_OrderType'] = 'other'  # Updated to match sample URL
+        vnp['vnp_Locale'] = 'vn'
+        vnp['vnp_ReturnUrl'] = current_app.config['VNPAY_RETURN_URL']
+        vnp['vnp_IpAddr'] = request.remote_addr or '127.0.0.1'  # Get client IP if available
+        vnp['vnp_CreateDate'] = datetime.now().strftime('%Y%m%d%H%M%S')
+        # Remove vnp_ExpireDate as it's not in the sample URL
+        
+        # Sort parameters by key before creating signature
+        input_data = sorted(vnp.items())
+        query = ''
+        for key, val in input_data:
+            if query != '':
+                query += '&' + key + '=' + urllib.parse.quote_plus(str(val))
+            else:
+                query = key + '=' + urllib.parse.quote_plus(str(val))
+        
+        # Create signature
+        vnp['vnp_SecureHash'] = hmacsha512(current_app.config['VNPAY_HASH_SECRET_KEY'], query)
+        
+        # Return the full VNPAY URL
+        payment_url = current_app.config['VNPAY_PAYMENT_URL'] + '?' + query + '&vnp_SecureHash=' + vnp['vnp_SecureHash']
+            
+        # Log the generated URL
+        current_app.logger.info(f"Generated VNPay URL for order {order_id}: {payment_url[:100]}...")
+            
+        return payment_url
+    except Exception as e:
+        current_app.logger.error(f"Error generating VNPay URL for order {order_id}: {str(e)}")
+        raise ValueError(f"Không thể tạo URL thanh toán: {str(e)}")
 
 def validate_vnpay_response(vnp_params):
     """Validate response from VNPAY after payment"""
-    # Remove vnp_SecureHash from the parameters
-    secure_hash = vnp_params.pop('vnp_SecureHash', '')
-    
-    # Sort remaining parameters and create data string for verification
-    input_data = sorted(vnp_params.items())
-    query = ''
-    for key, val in input_data:
-        if query != '':
-            query += '&' + key + '=' + urllib.parse.quote_plus(str(val))
-        else:
-            query = key + '=' + urllib.parse.quote_plus(str(val))
-    
-    # Compare the calculated hash with the hash from VNPAY
-    calculated_hash = hmacsha512(current_app.config['VNPAY_HASH_SECRET_KEY'], query)
-    
-    return secure_hash == calculated_hash
+    try:
+        if not vnp_params:
+            current_app.logger.error("Empty parameters received from VNPAY")
+            return False
+            
+        # Kiểm tra secure hash có tồn tại không
+        if 'vnp_SecureHash' not in vnp_params:
+            current_app.logger.error("Missing vnp_SecureHash in VNPAY response")
+            return False
+            
+        # Lưu lại secure hash từ VNPay
+        secure_hash = vnp_params.pop('vnp_SecureHash', '')
+        
+        # Log để debug
+        current_app.logger.debug(f"VNPAY response params (without secure hash): {vnp_params}")
+        current_app.logger.debug(f"VNPAY secure hash: {secure_hash}")
+        
+        # Sort remaining parameters and create data string for verification
+        input_data = sorted(vnp_params.items())
+        query = ''
+        for key, val in input_data:
+            if query != '':
+                query += '&' + key + '=' + urllib.parse.quote_plus(str(val))
+            else:
+                query = key + '=' + urllib.parse.quote_plus(str(val))
+        
+        # Calculate our hash using the same method
+        calculated_hash = hmacsha512(current_app.config['VNPAY_HASH_SECRET_KEY'], query)
+        
+        # Log để so sánh và kiểm tra
+        current_app.logger.debug(f"Generated query string: {query}")
+        current_app.logger.debug(f"Calculated hash: {calculated_hash}")
+        current_app.logger.debug(f"Hash comparison: {secure_hash == calculated_hash}")
+        
+        # Compare the calculated hash with the hash from VNPAY
+        return secure_hash == calculated_hash
+    except Exception as e:
+        current_app.logger.error(f"Error validating VNPAY response: {str(e)}", exc_info=True)
+        return False

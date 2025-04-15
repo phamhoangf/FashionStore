@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
+import { AuthContext } from '../../context/AuthContext';
 
 const AdminLayout = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -9,6 +10,7 @@ const AdminLayout = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout: authLogout } = useContext(AuthContext);
 
   // Use useCallback to memoize the checkAdminStatus function
   const checkAdminStatus = useCallback(async () => {
@@ -97,10 +99,18 @@ const AdminLayout = () => {
 
   const handleLogout = async () => {
     try {
-      await api.post('/auth/logout');
+      // Sử dụng hàm logout từ AuthContext
+      await authLogout();
+      
+      // Xóa thông tin admin khỏi localStorage
+      localStorage.removeItem('adminLoggedIn');
+      localStorage.removeItem('adminUser');
+      
+      // Chuyển hướng về trang đăng nhập admin
+      navigate('/admin/login');
     } catch (error) {
       console.error('Logout error:', error);
-    } finally {
+      // Ngay cả khi có lỗi, vẫn xóa thông tin và chuyển hướng
       localStorage.removeItem('token');
       localStorage.removeItem('adminLoggedIn');
       localStorage.removeItem('adminUser');
@@ -154,7 +164,7 @@ const AdminLayout = () => {
           <li className="nav-item">
             <Link 
               to="/admin" 
-              className={`nav-link text-white ${location.pathname === '/admin' ? 'active bg-primary rounded' : ''}`}
+              className={`nav-link text-white ${location.pathname === '/admin' || location.pathname === '/admin/dashboard' ? 'active bg-primary rounded' : ''}`}
             >
               <i className="bi bi-speedometer2 me-2"></i>
               {sidebarOpen && 'Dashboard'}

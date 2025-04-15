@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models.order import Order, OrderItem, OrderStatus
@@ -35,16 +35,33 @@ def get_orders():
 def get_order(id):
     user_id = get_jwt_identity()
     
-    # Lấy thông tin đơn hàng
-    order = OrderService.get_order_by_id(id)
-    
-    # Kiểm tra quyền truy cập
-    if order.user_id != user_id:
-        user = User.query.get(user_id)
-        if not user or user.role != 'admin':
-            return jsonify({"error": "Không có quyền truy cập đơn hàng này"}), 403
-    
-    return jsonify(order.to_dict()), 200
+    try:
+        # Ghi log thông tin yêu cầu
+        current_app.logger.info(f"User {user_id} requesting order details for ID: {id}")
+        
+        # Lấy thông tin đơn hàng
+        order = OrderService.get_order_by_id(id)
+        
+        # Ghi log để debug
+        current_app.logger.debug(f"Order user_id: {order.user_id}, Requesting user_id: {user_id}")
+        
+        # Kiểm tra quyền truy cập - Đảm bảo so sánh an toàn bằng cách chuyển đổi cả hai giá trị thành string
+        if str(order.user_id) != str(user_id):
+            # Kiểm tra xem người dùng hiện tại có phải admin không
+            user = User.query.get(user_id)
+            if not user or not user.is_admin:
+                current_app.logger.warning(f"User {user_id} attempted to access order {id} belonging to user {order.user_id}")
+                return jsonify({"error": "Bạn không có quyền xem đơn hàng này"}), 403
+        
+        # Log thành công
+        current_app.logger.info(f"User {user_id} successfully accessed order {id}")
+        return jsonify(order.to_dict(include_items=True)), 200
+    except ValueError as e:
+        current_app.logger.error(f"Error retrieving order {id}: {str(e)}")
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error retrieving order {id}: {str(e)}", exc_info=True)
+        return jsonify({"error": "Không thể tải thông tin đơn hàng. Vui lòng thử lại sau."}), 500
 
 @bp.route('', methods=['POST'])
 @jwt_required()
@@ -57,10 +74,10 @@ def create_order():
         if 'shippingInfo' in data:
             shipping_info = data['shippingInfo']
             order_data = {
-                'shipping_address': f"{shipping_info.get('address')}, {shipping_info.get('ward')}, {shipping_info.get('district')}",
+                'shipping_address': f"{shipping_info.get('address')}, {shipping_info.get('city')}",
                 'shipping_city': shipping_info.get('city'),
                 'shipping_phone': shipping_info.get('phone'),
-                'payment_method': data.get('paymentMethod') or shipping_info.get('paymentMethod'),
+                'payment_method': data.get('paymentMethod'),
                 'notes': shipping_info.get('notes', '')
             }
         else:
@@ -69,7 +86,7 @@ def create_order():
                 'shipping_address': data.get('shipping_address'),
                 'shipping_city': data.get('shipping_city'),
                 'shipping_phone': data.get('shipping_phone'),
-                'payment_method': data.get('payment_method'),
+                'payment_method': data.get('payment_method') or data.get('paymentMethod'),
                 'notes': data.get('notes', '')
             }
         
@@ -77,6 +94,15 @@ def create_order():
         errors = validate_order_data(order_data)
         if errors:
             return jsonify({"error": str(errors)}), 400
+            
+        # Chuẩn hóa payment_method
+        if order_data['payment_method']:
+            order_data['payment_method'] = order_data['payment_method'].lower()
+            
+        # Kiểm tra phương thức thanh toán hợp lệ
+        valid_payment_methods = ['cod', 'vnpay']
+        if order_data['payment_method'] not in valid_payment_methods:
+            return jsonify({"error": f"Phương thức thanh toán không hợp lệ. Chỉ hỗ trợ: {', '.join(valid_payment_methods)}"}), 400
         
         # Lấy thông tin giỏ hàng
         if 'items' in data:
@@ -120,23 +146,33 @@ def create_order():
 def cancel_order(id):
     user_id = get_jwt_identity()
     
-    # Lấy thông tin đơn hàng
-    order = OrderService.get_order_by_id(id)
-    
-    # Kiểm tra quyền truy cập
-    if order.user_id != user_id:
-        return jsonify({"error": "Không có quyền hủy đơn hàng này"}), 403
-    
-    # Kiểm tra trạng thái đơn hàng
-    if order.status != OrderStatus.PENDING.value:
-        return jsonify({"error": "Chỉ có thể hủy đơn hàng đang chờ xử lý"}), 400
-    
     try:
+        # Lấy thông tin đơn hàng
+        order = OrderService.get_order_by_id(id)
+        
+        # Ghi log để debug
+        current_app.logger.debug(f"Cancel order - Order user_id: {order.user_id}, Requesting user_id: {user_id}")
+        
+        # Kiểm tra quyền truy cập - Đảm bảo so sánh an toàn
+        if str(order.user_id) != str(user_id):
+            current_app.logger.warning(f"User {user_id} attempted to cancel order {id} belonging to user {order.user_id}")
+            return jsonify({"error": "Không có quyền hủy đơn hàng này"}), 403
+        
+        # Kiểm tra trạng thái đơn hàng
+        if order.status != OrderStatus.PENDING.value:
+            current_app.logger.warning(f"User {user_id} attempted to cancel non-pending order {id}, status: {order.status}")
+            return jsonify({"error": "Chỉ có thể hủy đơn hàng đang chờ xử lý"}), 400
+        
         # Cập nhật trạng thái đơn hàng
         order = OrderService.update_order_status(id, OrderStatus.CANCELLED.value)
-        return jsonify(order.to_dict()), 200
+        current_app.logger.info(f"Order {id} cancelled successfully by user {user_id}")
+        return jsonify(order.to_dict(include_items=True)), 200
+    except ValueError as e:
+        current_app.logger.error(f"Error cancelling order {id}: {str(e)}")
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        current_app.logger.error(f"Unexpected error cancelling order {id}: {str(e)}")
+        return jsonify({"error": f"Không thể hủy đơn hàng: {str(e)}"}), 500
 
 @bp.route('/admin', methods=['GET'])
 @jwt_required()
@@ -175,6 +211,38 @@ def admin_update_order_status(id):
     try:
         # Cập nhật trạng thái đơn hàng
         order = OrderService.update_order_status(id, data['status'])
-        return jsonify(order.to_dict()), 200
-    except Exception as e:
+        return jsonify(order.to_dict(include_items=True)), 200
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error updating order {id} status: {e}")
+        return jsonify({"error": "Lỗi server khi cập nhật trạng thái đơn hàng"}), 500
+
+@bp.route('/<int:id>/payment-status', methods=['GET'])
+def get_order_payment_status(id):
+    """
+    Public endpoint để lấy trạng thái thanh toán của đơn hàng sau khi thanh toán VNPay
+    Endpoint này không yêu cầu xác thực JWT để phục vụ luồng redirect từ VNPay
+    """
+    try:
+        # Log request
+        current_app.logger.info(f"Getting payment status for order {id} (public endpoint)")
+        
+        # Lấy thông tin đơn hàng - chỉ trả về thông tin trạng thái thanh toán
+        order = OrderService.get_order_by_id(id)
+        
+        # Trả về thông tin thanh toán cơ bản
+        return jsonify({
+            "order_id": order.id,
+            "payment_status": order.payment_status,
+            "transaction_id": order.transaction_id,
+            "total_amount": order.total_amount,
+            "order_date": order.created_at.isoformat() if order.created_at else None,
+            "payment_method": order.payment_method
+        }), 200
+    except ValueError as e:
+        current_app.logger.error(f"Error retrieving payment status for order {id}: {str(e)}")
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error retrieving payment status for order {id}: {str(e)}", exc_info=True)
+        return jsonify({"error": "Không thể tải thông tin thanh toán. Vui lòng thử lại sau."}), 500

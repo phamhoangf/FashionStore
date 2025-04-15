@@ -104,3 +104,90 @@ def status():
 def logout():
     # Phía client cần xóa token
     return jsonify({'message': 'Đăng xuất thành công'}), 200
+
+@bp.route('/profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Người dùng không tồn tại'}), 404
+        
+        data = request.get_json()
+        
+        # Cập nhật thông tin
+        if 'name' in data:
+            user.name = data['name']
+        if 'phone' in data:
+            user.phone = data['phone']
+        if 'address' in data:
+            user.address = data['address']
+        
+        db.session.commit()
+        
+        return jsonify({'user': user.to_dict(), 'message': 'Cập nhật thông tin thành công'}), 200
+    except Exception as e:
+        print(f"Update profile error: {str(e)}")
+        return jsonify({'error': 'Lỗi cập nhật thông tin, vui lòng thử lại sau'}), 500
+
+@bp.route('/password', methods=['PUT'])
+@jwt_required()
+def change_password():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Người dùng không tồn tại'}), 404
+        
+        data = request.get_json()
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        if not current_password or not new_password:
+            return jsonify({'error': 'Mật khẩu hiện tại và mật khẩu mới là bắt buộc'}), 400
+        
+        # Kiểm tra mật khẩu hiện tại
+        if not user.verify_password(current_password):
+            return jsonify({'error': 'Mật khẩu hiện tại không đúng'}), 400
+        
+        # Cập nhật mật khẩu mới
+        user.password = new_password
+        db.session.commit()
+        
+        return jsonify({'message': 'Thay đổi mật khẩu thành công'}), 200
+    except Exception as e:
+        print(f"Change password error: {str(e)}")
+        return jsonify({'error': 'Lỗi thay đổi mật khẩu, vui lòng thử lại sau'}), 500
+
+@bp.route('/avatar', methods=['POST'])
+@jwt_required()
+def upload_avatar():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Người dùng không tồn tại'}), 404
+        
+        if 'avatar' not in request.files:
+            return jsonify({'error': 'Không tìm thấy file ảnh đại diện'}), 400
+        
+        avatar_file = request.files['avatar']
+        
+        if avatar_file.filename == '':
+            return jsonify({'error': 'Không có file nào được chọn'}), 400
+        
+        # Xử lý lưu file ảnh đại diện
+        # TODO: Implement file upload logic
+        
+        # Cập nhật đường dẫn ảnh đại diện cho user
+        # user.avatar_url = avatar_path
+        # db.session.commit()
+        
+        return jsonify({'user': user.to_dict(), 'message': 'Cập nhật ảnh đại diện thành công'}), 200
+    except Exception as e:
+        print(f"Upload avatar error: {str(e)}")
+        return jsonify({'error': 'Lỗi tải lên ảnh đại diện, vui lòng thử lại sau'}), 500

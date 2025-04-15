@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getProductById } from '../services/productService';
+import { getProductById, getProducts } from '../services/productService';
 import { CartContext } from '../context/CartContext';
 import { AuthContext } from '../context/AuthContext';
 import { formatImageUrl } from '../utils/imageUtils';
+import ProductCard from '../components/product/ProductCard';
+import { toast } from 'react-toastify';
+import { Container, Row, Col, Spinner, Alert, Modal, Button } from 'react-bootstrap';
 import './ProductDetailPage.css';
 
 // Ảnh mặc định khi không có ảnh
 const DEFAULT_IMAGE = 'https://via.placeholder.com/600x800?text=No+Image';
+
+// Danh sách sizes mặc định nếu sản phẩm không có sizes
+const DEFAULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -16,20 +22,34 @@ const ProductDetailPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState('');
   const [error, setError] = useState('');
+  const [sizeError, setSizeError] = useState('');
   const { addItem } = useContext(CartContext);
   const { isAuthenticated } = useContext(AuthContext);
   const navigate = useNavigate();
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [imageSrc, setImageSrc] = useState('');
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
+        setImageLoaded(false);
+        setImageError(false);
+        
         const data = await getProductById(id);
         setProduct(data);
-        if (data.sizes && data.sizes.length > 0) {
-          setSelectedSize(data.sizes[0]);
+        
+        // Xử lý dữ liệu sizes (sử dụng sizes từ API hoặc sizes mặc định)
+        const availableSizes = data.sizes && data.sizes.length > 0 
+          ? data.sizes 
+          : DEFAULT_SIZES;
+          
+        // Chọn size đầu tiên trong danh sách
+        if (availableSizes.length > 0) {
+          setSelectedSize(availableSizes[0]);
         }
         
         // Xác định nguồn ảnh
@@ -37,7 +57,8 @@ const ProductDetailPage = () => {
           setImageSrc(DEFAULT_IMAGE);
           setImageLoaded(true);
         } else {
-          setImageSrc(formatImageUrl(data.image_url, DEFAULT_IMAGE));
+          const formattedUrl = formatImageUrl(data.image_url, DEFAULT_IMAGE);
+          setImageSrc(formattedUrl);
         }
       } catch (error) {
         console.error('Error fetching product:', error);
@@ -49,6 +70,37 @@ const ProductDetailPage = () => {
 
     fetchProduct();
   }, [id]);
+
+  // Thêm useEffect mới để lấy sản phẩm tương tự
+  useEffect(() => {
+    const fetchSimilarProducts = async () => {
+      if (!product) return;
+      
+      try {
+        // Chỉ lấy sản phẩm cùng danh mục
+        const response = await getProducts({
+          category: product.category_id,
+          limit: 8 // Lấy nhiều hơn để sau khi lọc vẫn còn đủ sản phẩm
+        });
+        
+        console.log('Similar products response:', response);
+        
+        if (response && response.items) {
+          // Lọc ra sản phẩm hiện tại từ danh sách
+          const filtered = response.items.filter(item => item.id !== product.id);
+          
+          // Giới hạn số lượng sản phẩm hiển thị (chọn 4 sản phẩm đầu tiên)
+          setSimilarProducts(filtered.slice(0, 8));
+        }
+      } catch (error) {
+        console.error('Error fetching similar products:', error);
+      }
+    };
+
+    if (product) {
+      fetchSimilarProducts();
+    }
+  }, [product]);
 
   const handleQuantityChange = useCallback((e) => {
     const value = parseInt(e.target.value);
@@ -69,18 +121,53 @@ const ProductDetailPage = () => {
     }
   };
 
+  const handleSizeSelect = (size) => {
+    setSelectedSize(size);
+    setSizeError(''); // Xóa thông báo lỗi nếu có
+  };
+
+  const openAddModal = () => {
+    if (!selectedSize && product && product.sizes && product.sizes.length > 0) {
+      setSizeError('Vui lòng chọn kích thước trước khi thêm vào giỏ hàng');
+      return;
+    }
+    setSizeError('');
+    setShowAddModal(true);
+  };
+  
+  const closeAddModal = () => {
+    setShowAddModal(false);
+  };
+  
   const handleAddToCart = useCallback(() => {
     if (!isAuthenticated) {
       // Chuyển hướng đến trang đăng nhập
-      window.location.href = '/login';
+      navigate('/login?redirect=/products/' + id);
+      return;
+    }
+    
+    if (!selectedSize && product && product.sizes && product.sizes.length > 0) {
+      setSizeError('Vui lòng chọn kích thước trước khi thêm vào giỏ hàng');
       return;
     }
     
     if (product) {
-      addItem(product.id, quantity);
-      alert('Đã thêm sản phẩm vào giỏ hàng!');
+      // Close modal first for immediate UI response
+      closeAddModal();
+      
+      // Add item to cart without blocking UI
+      addItem(product.id, quantity, selectedSize)
+        .then(() => {
+          setQuantity(1);
+          setError('');
+          toast.success(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+        })
+        .catch(error => {
+          // Hiển thị thông báo lỗi nếu có
+          toast.error(error.message || 'Không thể thêm sản phẩm vào giỏ hàng');
+        });
     }
-  }, [addItem, isAuthenticated, product, quantity]);
+  }, [addItem, isAuthenticated, product, quantity, selectedSize, id, navigate, closeAddModal]);
 
   // Xử lý sự kiện khi ảnh tải xong
   const handleImageLoad = useCallback(() => {
@@ -91,6 +178,7 @@ const ProductDetailPage = () => {
   const handleImageError = useCallback(() => {
     setImageSrc(DEFAULT_IMAGE);
     setImageLoaded(true);
+    setImageError(true);
   }, []);
 
   if (loading) {
@@ -115,6 +203,11 @@ const ProductDetailPage = () => {
       </div>
     );
   }
+  
+  // Lấy danh sách sizes (từ API hoặc mặc định)
+  const availableSizes = product.sizes && product.sizes.length > 0 
+    ? product.sizes 
+    : DEFAULT_SIZES;
 
   return (
     <div className="container py-5">
@@ -142,6 +235,11 @@ const ProductDetailPage = () => {
               alt={product.name}
               onLoad={handleImageLoad}
               onError={handleImageError}
+              style={{ 
+                maxWidth: '100%',
+                maxHeight: '100%',
+                objectFit: 'contain'
+              }}
             />
           </div>
         </div>
@@ -150,8 +248,8 @@ const ProductDetailPage = () => {
           
           <div className="mb-3">
             <h4 className="text-primary">{product.price.toLocaleString('vi-VN')} VNĐ</h4>
-            {product.oldPrice && (
-              <del className="text-muted ms-2">{product.oldPrice.toLocaleString('vi-VN')} VNĐ</del>
+            {product.discount_price && (
+              <del className="text-muted ms-2">{product.discount_price.toLocaleString('vi-VN')} VNĐ</del>
             )}
           </div>
 
@@ -159,23 +257,26 @@ const ProductDetailPage = () => {
             <p>{product.description}</p>
           </div>
 
-          {product.sizes && product.sizes.length > 0 && (
-            <div className="mb-4">
-              <h5>Kích thước:</h5>
-              <div className="btn-group" role="group">
-                {product.sizes.map(size => (
-                  <button
-                    key={size}
-                    type="button"
-                    className={`btn ${selectedSize === size ? 'btn-primary' : 'btn-outline-primary'}`}
-                    onClick={() => setSelectedSize(size)}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
+          <div className="mb-4">
+            <h5>Kích thước:</h5>
+            <div className="size-selector">
+              {availableSizes.map(size => (
+                <button
+                  key={size}
+                  type="button"
+                  className={`btn size-btn ${selectedSize === size ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => handleSizeSelect(size)}
+                >
+                  {size}
+                </button>
+              ))}
             </div>
-          )}
+            {sizeError && (
+              <div className="text-danger mt-2">
+                <small>{sizeError}</small>
+              </div>
+            )}
+          </div>
 
           <div className="mb-4">
             <h5>Số lượng:</h5>
@@ -200,30 +301,47 @@ const ProductDetailPage = () => {
           )}
 
           <div className="d-grid gap-2">
-            <button className="btn btn-primary" onClick={handleAddToCart}>
+            <button className="btn btn-primary" onClick={openAddModal}>
               Thêm vào giỏ hàng
             </button>
             <Link to="/cart" className="btn btn-outline-primary">
-              Đi đến giỏ hàng
+              Xem giỏ hàng
             </Link>
-          </div>
-
-          <div className="mt-4">
-            <div className="d-flex align-items-center mb-2">
-              <i className="bi bi-truck me-2"></i>
-              <span>Miễn phí vận chuyển cho đơn hàng trên 500.000 VNĐ</span>
-            </div>
-            <div className="d-flex align-items-center mb-2">
-              <i className="bi bi-arrow-return-left me-2"></i>
-              <span>Đổi trả trong vòng 30 ngày</span>
-            </div>
-            <div className="d-flex align-items-center">
-              <i className="bi bi-shield-check me-2"></i>
-              <span>Bảo hành 12 tháng</span>
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Hiển thị sản phẩm tương tự */}
+      {similarProducts.length > 0 && (
+        <div className="similar-products mt-5">
+          <h3 className="mb-4">Sản phẩm tương tự</h3>
+          <div className="row">
+            {similarProducts.map(product => (
+              <div key={product.id} className="col-md-3 mb-4">
+                <ProductCard product={product} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận thêm vào giỏ hàng */}
+      <Modal show={showAddModal} onHide={closeAddModal}>
+        <Modal.Header closeButton>
+          <Modal.Title>Xác nhận thêm vào giỏ hàng</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Bạn có muốn thêm sản phẩm "{product?.name}" {selectedSize && `(Size ${selectedSize})`} với số lượng {quantity} vào giỏ hàng không?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeAddModal}>
+            Hủy bỏ
+          </Button>
+          <Button variant="primary" onClick={handleAddToCart}>
+            Thêm vào giỏ hàng
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

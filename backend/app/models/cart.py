@@ -32,6 +32,7 @@ class CartItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'), nullable=False)
     quantity = db.Column(db.Integer, default=1)
+    size = db.Column(db.String(10), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -41,6 +42,7 @@ class CartItem(db.Model):
             'user_id': self.user_id,
             'product_id': self.product_id,
             'cart_id': self.cart_id,
+            'size': self.size,
             'product': self.product.to_dict() if self.product else None,
             'quantity': self.quantity,
             'price': self.product.price if self.product else 0,

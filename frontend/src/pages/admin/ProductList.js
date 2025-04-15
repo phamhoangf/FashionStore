@@ -80,33 +80,41 @@ const MOCK_CATEGORIES = [
 // Component hiển thị ảnh sản phẩm với xử lý tải ảnh
 const ProductImage = React.memo(({ product }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [imageSrc, setImageSrc] = useState('');
   const fallbackImage = 'https://via.placeholder.com/60x60?text=No+Image';
 
   // Xác định nguồn ảnh khi component được tạo
   useEffect(() => {
     if (!product.image_url || product.image_url.trim() === '') {
+      console.log('ProductImage - No image URL, using fallback');
       setImageSrc(fallbackImage);
       setImageLoaded(true);
     } else {
-      setImageSrc(formatImageUrl(product.image_url, fallbackImage));
+      console.log('ProductImage - Original image URL:', product.image_url);
+      const formattedUrl = formatImageUrl(product.image_url, fallbackImage);
+      console.log('ProductImage - Formatted image URL:', formattedUrl);
+      setImageSrc(formattedUrl);
     }
   }, [product.image_url]);
 
   // Xử lý sự kiện khi ảnh tải xong
   const handleImageLoad = useCallback(() => {
+    console.log('ProductImage - Image loaded successfully:', imageSrc);
     setImageLoaded(true);
-  }, []);
+  }, [imageSrc]);
 
   // Xử lý sự kiện khi ảnh lỗi
   const handleImageError = useCallback(() => {
+    console.error('ProductImage - Error loading image:', imageSrc);
+    setImageError(true);
     setImageSrc(fallbackImage);
     setImageLoaded(true);
-  }, []);
+  }, [imageSrc]);
 
   return (
     <div className="product-image-container">
-      {!imageLoaded && (
+      {!imageLoaded && !imageError && (
         <div className="image-placeholder">
           <div className="spinner-border spinner-border-sm" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -132,6 +140,7 @@ const ProductList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // State mới để lưu giá trị đang nhập
   const [selectedCategory, setSelectedCategory] = useState('');
   const [useMockData, setUseMockData] = useState(false);
 
@@ -263,6 +272,7 @@ const ProductList = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    setSearchTerm(searchInput); // Chỉ cập nhật searchTerm khi submit form
     setCurrentPage(1); // Reset về trang 1 khi tìm kiếm
   };
 
@@ -302,6 +312,7 @@ const ProductList = () => {
 
   const handleReset = () => {
     setSearchTerm('');
+    setSearchInput('');
     setSelectedCategory('');
     setCurrentPage(1);
   };
@@ -350,8 +361,8 @@ const ProductList = () => {
                     type="text"
                     className="form-control"
                     placeholder="Tìm kiếm sản phẩm..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                   />
                   <button className="btn btn-outline-secondary" type="submit">
                     <i className="bi bi-search"></i>
@@ -497,4 +508,4 @@ const ProductList = () => {
   );
 };
 
-export default ProductList; 
+export default ProductList;

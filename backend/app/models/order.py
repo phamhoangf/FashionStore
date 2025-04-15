@@ -55,6 +55,12 @@ class Order(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
         
+        # Add customer information
+        if hasattr(self, 'user') and self.user:
+            order_dict['customer_name'] = self.user.name
+            order_dict['customer_email'] = self.user.email
+            order_dict['customer_phone'] = self.user.phone
+        
         # Only include items if requested
         if include_items:
             try:

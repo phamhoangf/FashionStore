@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import { login, register, logout, checkAuthStatus } from '../services/authService';
 
 export const AuthContext = createContext();
@@ -38,6 +38,8 @@ export const AuthProvider = ({ children }) => {
       if (response && response.user) {
         console.log('User info from login response:', response.user);
         setUser(response.user);
+        // Phát sự kiện đăng nhập thành công để các component khác biết
+        window.dispatchEvent(new CustomEvent('user-login'));
         return response;
       } else if (response && response.access_token) {
         // Nếu có access_token nhưng không có user, thử lấy thông tin user
@@ -46,6 +48,8 @@ export const AuthProvider = ({ children }) => {
           const userData = await checkAuthStatus();
           console.log('User info from checkAuthStatus:', userData);
           setUser(userData);
+          // Phát sự kiện đăng nhập thành công để các component khác biết
+          window.dispatchEvent(new CustomEvent('user-login'));
           return { ...response, user: userData };
         } catch (statusError) {
           console.error('Error getting user status after login:', statusError);
@@ -77,6 +81,20 @@ export const AuthProvider = ({ children }) => {
       console.log('Register response in context:', response);
       if (response && response.user) {
         setUser(response.user);
+      } else {
+        // Nếu không có user trong response, thử đăng nhập với flag skipValidation
+        try {
+          const loginResponse = await loginUser({
+            ...userData,
+            skipValidation: true
+          });
+          if (loginResponse && loginResponse.user) {
+            setUser(loginResponse.user);
+          }
+        } catch (loginError) {
+          console.error('Auto login after register failed:', loginError);
+          // Không ném lỗi ở đây để không làm gián đoạn quá trình đăng ký
+        }
       }
       return response;
     } catch (error) {
@@ -87,16 +105,31 @@ export const AuthProvider = ({ children }) => {
 
   const logoutUser = async () => {
     try {
+      // Notify any component that needs to clear data on logout
+      window.dispatchEvent(new CustomEvent('user-logout'));
+      
+      // Perform logout API call
       await logout();
+      
+      // Clear user data
       setUser(null);
+      
+      // Delete all auth tokens
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
     } catch (error) {
       console.error('Logout failed in context:', error);
       setUser(null);
+      localStorage.removeItem('token');
     }
   };
 
   const isAdmin = () => {
     return user && user.is_admin === true;
+  };
+
+  const updateUser = (userData) => {
+    setUser(userData);
   };
 
   return (
@@ -109,6 +142,7 @@ export const AuthProvider = ({ children }) => {
         logout: logoutUser,
         isAuthenticated: !!user,
         isAdmin: isAdmin,
+        setUser: updateUser,
       }}
     >
       {children}

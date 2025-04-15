@@ -1,81 +1,479 @@
-import React, { useContext, useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { Container, Row, Col, Form, Button, Card, Alert, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { CartContext } from '../context/CartContext';
-import Checkout from '../components/cart/Checkout';
-import api from '../services/api';
+import { createOrder, payWithVNPay } from '../services/orderService';
+import { formatCurrency } from '../utils/formatUtils';
 
 const CheckoutPage = () => {
-  const { user, isAuthenticated } = useContext(AuthContext);
-  const { cart, loading } = useContext(CartContext);
-  const [error, setError] = useState('');
-  const [orderSuccess, setOrderSuccess] = useState(false);
-  const [orderId, setOrderId] = useState(null);
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
+  const { cart, totalAmount, removeSelectedItems, calculateSelectedTotal } = useContext(CartContext);
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [shippingFee, setShippingFee] = useState(30000); // Phí vận chuyển mặc định
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectedItemsData, setSelectedItemsData] = useState([]);
+  const [selectedTotal, setSelectedTotal] = useState(0);
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    city: '',
+    notes: '',
+    paymentMethod: 'cod' // Mặc định là thanh toán khi nhận hàng
+  });
 
-  if (loading) {
-    return <div className="text-center p-5"><div className="spinner-border"></div></div>;
-  }
+  // Biến kiểm soát đã hoàn thành kiểm tra chưa để tránh redirect loop
+  const [checkoutInitialized, setCheckoutInitialized] = useState(false);
 
-  if (cart.items.length === 0 && !orderSuccess) {
-    navigate('/cart');
-    return null;
-  }
+  // Lấy thông tin người dùng khi component được tải và đọc selected items từ localStorage
+  useEffect(() => {
+    console.log('CheckoutPage mounted - checking auth and selected items');
+    let mounted = true;
+    
+    const initializeCheckout = async () => {
+      // Đặt cờ để theo dõi trạng thái
+      let redirectNeeded = false;
+      let redirectCause = '';
+      
+      if (user) {
+        if (mounted) {
+          setFormData(prevState => ({
+            ...prevState,
+            name: user.name || '',
+            phone: user.phone || '',
+            address: user.address || '',
+            city: user.city || ''
+          }));
+        }
+      } else {
+        console.log('User not authenticated in checkout page');
+        redirectNeeded = true;
+        redirectCause = 'not authenticated';
+      }
+      
+      // Load selected items from localStorage
+      const selectedFromStorage = localStorage.getItem('selectedCartItems');
+      if (selectedFromStorage) {
+        try {
+          const parsedSelected = JSON.parse(selectedFromStorage);
+          console.log('Loaded selected items from localStorage:', parsedSelected);
+          
+          if (parsedSelected && parsedSelected.length > 0) {
+            if (mounted) {
+              setSelectedItems(parsedSelected);
+            }
+          } else {
+            console.log('Empty selected items array in localStorage');
+            redirectNeeded = true;
+            redirectCause = 'empty selected items';
+          }
+        } catch (err) {
+          console.error('Error parsing selected items:', err);
+          redirectNeeded = true;
+          redirectCause = 'parse error';
+        }
+      } else {
+        console.log('No selected items found in localStorage');
+        redirectNeeded = true;
+        redirectCause = 'no selected items';
+      }
+      
+      // Thực hiện chuyển hướng sau khi kiểm tra tất cả điều kiện
+      if (mounted) {
+        if (redirectNeeded) {
+          console.log(`Redirecting to cart page. Cause: ${redirectCause}`);
+          // Đặt timeout để tránh race condition
+          setTimeout(() => {
+            if (mounted) navigate('/cart');
+          }, 100);
+        } else {
+          // Đánh dấu đã hoàn thành việc khởi tạo
+          setCheckoutInitialized(true);
+        }
+      }
+    };
+    
+    initializeCheckout();
+    
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
+  }, [user, navigate]);
 
-  const handleCheckout = async (shippingInfo) => {
-    try {
-      const response = await api.post('/orders', {
-        shipping_address: `${shippingInfo.address}, ${shippingInfo.ward}, ${shippingInfo.district}`,
-        shipping_city: shippingInfo.city,
-        shipping_phone: shippingInfo.phone,
-        payment_method: shippingInfo.paymentMethod,
-        notes: shippingInfo.notes || '',
-        email: shippingInfo.email || (user ? user.email : '')
+  // Update selected items data whenever selectedItems or cart changes
+  useEffect(() => {
+    if (selectedItems.length > 0 && cart.length > 0) {
+      console.log('Selected items from localStorage:', selectedItems);
+      console.log('Cart items from context:', cart);
+      
+      // Convert all IDs to strings to ensure consistent comparison
+      const stringSelectedItems = selectedItems.map(id => String(id));
+      
+      // Log each item in cart for debugging
+      cart.forEach(item => {
+        console.log(`Cart item: ID=${item.id}, Type=${typeof item.id}, Selected=${stringSelectedItems.includes(String(item.id))}`);
       });
+      
+      // Ensure consistent comparison by converting to string
+      const selected = cart.filter(item => stringSelectedItems.includes(String(item.id)));
+      console.log('Selected items after filtering:', selected);
+      
+      if (selected.length > 0) {
+        setSelectedItemsData(selected);
+        const total = calculateSelectedTotal(selectedItems);
+        setSelectedTotal(total);
+      } else {
+        console.log('No matching items found in cart based on selectedItems IDs');
+        setSelectedItemsData([]);
+        setSelectedTotal(0);
+      }
+    } else {
+      console.log('Either selectedItems or cart is empty', { 
+        selectedItemsLength: selectedItems.length, 
+        cartLength: cart.length 
+      });
+      setSelectedItemsData([]);
+      setSelectedTotal(0);
+    }
+  }, [selectedItems, cart, calculateSelectedTotal]);
 
-      setOrderSuccess(true);
-      setOrderId(response.id);
+  // Kiểm tra giỏ hàng trống hoặc không có item được chọn
+  useEffect(() => {
+    // Đặt một delay ngắn để đảm bảo dữ liệu đã được xử lý trước khi kiểm tra
+    const timer = setTimeout(() => {
+      // Chỉ thực hiện kiểm tra khi đã hoàn thành việc khởi tạo và đã tải dữ liệu xong
+      if (checkoutInitialized && !loading && cart.length > 0 && selectedItems.length > 0) {
+        console.log('Checking for empty selected items data after initialization');
+        
+        if (selectedItemsData.length === 0) {
+          console.log('Selected items not found in cart after loading, returning to cart');
+          // Lưu trạng thái lỗi vào localStorage để hiển thị thông báo ở trang giỏ hàng
+          localStorage.setItem('checkout_error', 'Không tìm thấy sản phẩm đã chọn trong giỏ hàng');
+          navigate('/cart');
+        } else {
+          console.log('Selected items found in cart, checkout can proceed');
+          // Đảm bảo xóa lỗi nếu có
+          localStorage.removeItem('checkout_error');
+        }
+      }
+    }, 500); // Chờ 500ms để đảm bảo các dữ liệu đã được cập nhật
+    
+    return () => clearTimeout(timer);
+  }, [cart, selectedItems, selectedItemsData, navigate, loading, checkoutInitialized]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    // Kiểm tra thông tin
+    if (!formData.name || !formData.phone || !formData.address || !formData.city) {
+      setError('Vui lòng điền đầy đủ thông tin giao hàng');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Chuẩn bị dữ liệu đơn hàng chỉ với các mặt hàng đã chọn
+      const orderData = {
+        shippingInfo: {
+          name: formData.name,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          notes: formData.notes
+        },
+        paymentMethod: formData.paymentMethod,
+        items: selectedItemsData.map(item => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+          size: item.size
+        }))
+      };
+
+      console.log('Sending order data:', orderData);
+
+      // Tạo đơn hàng
+      const order = await createOrder(orderData);
+      console.log('Order created:', order);
+      
+      // Xử lý thanh toán
+      if (formData.paymentMethod === 'vnpay') {
+        try {
+          // Nếu thanh toán qua VNPay, chuyển hướng đến trang thanh toán
+          const paymentResponse = await payWithVNPay(order.id);
+          console.log('Payment response:', paymentResponse);
+          if (paymentResponse && paymentResponse.payment_url) {
+            // Lưu danh sách các sản phẩm đã chọn và order ID vào localStorage để xử lý sau khi thanh toán thành công
+            localStorage.setItem('vnpay_pending_order', order.id);
+            localStorage.setItem('vnpay_pending_items', JSON.stringify(selectedItems));
+            localStorage.setItem('vnpay_payment_timestamp', new Date().getTime().toString());
+            
+            console.log('Saved pending VNPay order info to localStorage, redirecting to payment page');
+            
+            // Add a small delay before redirecting to VNPay page
+            setTimeout(() => {
+              window.location.href = paymentResponse.payment_url;
+            }, 300); // 300ms delay should be enough
+          } else {
+            throw new Error('Không thể tạo URL thanh toán');
+          }
+        } catch (paymentError) {
+          console.error('VNPay payment error:', paymentError);
+          setError(paymentError.message || 'Lỗi khi tạo thanh toán VNPay');
+          setLoading(false);
+          return;
+        }
+      } else {
+        // Nếu thanh toán khi nhận hàng (COD), xóa sản phẩm đã chọn khỏi giỏ hàng và chuyển hướng đến trang thành công
+          console.log('Processing COD payment for order:', order.id);
+          
+          try {
+            // Xóa các sản phẩm đã chọn khỏi giỏ hàng - OrderSuccessPage sẽ xử lý việc này
+            // Lưu trữ danh sách sản phẩm được chọn để OrderSuccessPage xử lý
+            console.log('Preparing to navigate to order success page');
+            
+            // Add a small delay before navigation to ensure order is fully processed
+            setTimeout(() => {
+              navigate(`/order-success/${order.id}`);
+            }, 300); // 300ms delay should be enough
+            
+          } catch (clearError) {
+            console.error('Error during COD checkout:', clearError);
+            // Still navigate even if there was an error
+            navigate(`/order-success/${order.id}`);
+          }
+      }
     } catch (error) {
       console.error('Checkout error:', error);
-      setError(error.message || 'Đã có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.');
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        setError(error.response?.data?.error || error.message || 'Đã xảy ra lỗi khi đặt hàng. Vui lòng thử lại sau.');
+      } else {
+        setError(error.message || 'Đã xảy ra lỗi khi đặt hàng. Vui lòng thử lại sau.');
+      }
+      setLoading(false);
     }
   };
 
-  if (orderSuccess) {
+  if (!user) {
     return (
-      <div className="container py-5">
-        <div className="card p-5 text-center">
-          <div className="mb-4">
-            <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '4rem' }}></i>
-          </div>
-          <h1 className="mb-4">Đặt hàng thành công!</h1>
-          <p className="mb-3">Mã đơn hàng của bạn là: <strong>{orderId}</strong></p>
-          <p className="mb-4">Cảm ơn bạn đã mua hàng tại cửa hàng của chúng tôi.</p>
-          <div className="d-flex justify-content-center gap-3">
-            <button className="btn btn-primary" onClick={() => navigate('/')}>
-              Tiếp tục mua sắm
-            </button>
-            <button className="btn btn-outline-primary" onClick={() => navigate('/orders')}>
-              Xem đơn hàng
-            </button>
-          </div>
-        </div>
-      </div>
+      <Container className="py-5">
+        <Alert variant="warning">
+          Vui lòng <Alert.Link href="/login?redirect=/checkout">đăng nhập</Alert.Link> để tiếp tục thanh toán.
+        </Alert>
+      </Container>
     );
   }
 
   return (
-    <div className="container py-5">
+    <Container className="py-5">
       <h1 className="mb-4">Thanh toán</h1>
-
+      
       {error && (
-        <div className="alert alert-danger mb-4" role="alert">
+        <Alert variant="danger" dismissible onClose={() => setError('')}>
           {error}
-        </div>
+        </Alert>
       )}
-
-      <Checkout onSubmit={handleCheckout} />
-    </div>
+      
+      <Row>
+        <Col md={8}>
+          <Card className="shadow-sm mb-4">
+            <Card.Header className="bg-white">
+              <h5 className="mb-0">Thông tin giao hàng</h5>
+            </Card.Header>
+            <Card.Body>
+              <Form onSubmit={handleSubmit}>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Họ tên người nhận <span className="text-danger">*</span></Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
+                      <Form.Control
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Địa chỉ <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    required
+                  />
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Tỉnh/Thành phố <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    required
+                  />
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Ghi chú</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleChange}
+                    placeholder="Ghi chú về đơn hàng, ví dụ: thời gian hay chỉ dẫn địa điểm giao hàng chi tiết hơn."
+                  />
+                </Form.Group>
+                
+                <Card className="mb-4">
+                  <Card.Header className="bg-white">
+                    <h5 className="mb-0">Phương thức thanh toán</h5>
+                  </Card.Header>
+                  <Card.Body>
+                    <Form.Group>
+                      <Form.Check
+                        type="radio"
+                        id="cod"
+                        name="paymentMethod"
+                        value="cod"
+                        label="Thanh toán khi nhận hàng (COD)"
+                        checked={formData.paymentMethod === 'cod'}
+                        onChange={handleChange}
+                        className="mb-2"
+                      />
+                      <Form.Check
+                        type="radio"
+                        id="vnpay"
+                        name="paymentMethod"
+                        value="vnpay"
+                        label="Thanh toán qua VNPay (Thẻ ATM, Visa, MasterCard, JCB, QR Code)"
+                        checked={formData.paymentMethod === 'vnpay'}
+                        onChange={handleChange}
+                      />
+                    </Form.Group>
+                  </Card.Body>
+                </Card>
+                
+                <div className="d-grid">
+                  <Button 
+                    variant="primary" 
+                    type="submit" 
+                    size="lg" 
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Spinner
+                          as="span"
+                          animation="border"
+                          size="sm"
+                          role="status"
+                          aria-hidden="true"
+                        />
+                        <span className="ms-2">Đang xử lý...</span>
+                      </>
+                    ) : (
+                      'Đặt hàng'
+                    )}
+                  </Button>
+                </div>
+              </Form>
+            </Card.Body>
+          </Card>
+        </Col>
+        
+        <Col md={4}>
+          <Card className="shadow-sm mb-4">
+            <Card.Header className="bg-white">
+              <h5 className="mb-0">Đơn hàng của bạn ({selectedItemsData.length} sản phẩm)</h5>
+            </Card.Header>
+            <Card.Body>
+              <div className="mb-3">
+                {selectedItemsData.map(item => (
+                  <div key={item.id} className="d-flex justify-content-between mb-2">
+                    <div>
+                      <span className="fw-bold">{item.quantity} x </span>
+                      {item.product.name}
+                      <br />
+                      <small className="text-muted">Size: {item.size}</small>
+                    </div>
+                    <div>{formatCurrency(item.product.price * item.quantity)}</div>
+                  </div>
+                ))}
+              </div>
+              
+              <hr />
+              
+              <div className="d-flex justify-content-between mb-2">
+                <div>Tạm tính:</div>
+                <div>{formatCurrency(selectedTotal)}</div>
+              </div>
+              
+              <div className="d-flex justify-content-between mb-2">
+                <div>Phí vận chuyển:</div>
+                <div>{formatCurrency(shippingFee)}</div>
+              </div>
+              
+              <hr />
+              
+              <div className="d-flex justify-content-between mb-2 fw-bold">
+                <div>Tổng cộng:</div>
+                <div>{formatCurrency(selectedTotal + shippingFee)}</div>
+              </div>
+            </Card.Body>
+          </Card>
+          
+          <Card className="shadow-sm">
+            <Card.Body>
+              <Button 
+                variant="outline-secondary" 
+                className="w-100"
+                onClick={() => {
+                  localStorage.removeItem('selectedCartItems');
+                  navigate('/cart');
+                }}
+              >
+                Quay lại giỏ hàng
+              </Button>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 
