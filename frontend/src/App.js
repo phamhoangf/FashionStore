@@ -10,6 +10,7 @@ import './App.css';
 // Import chatbot components
 import ChatbotButton from './components/chatbot/ChatbotButton';
 import ChatbotModal from './components/chatbot/ChatbotModal';
+import ScrollToTop from './components/common/ScrollToTop';
 
 // Lazy load components
 const Layout = React.lazy(() => import('./components/layout/Layout'));
@@ -105,6 +106,7 @@ const App = () => {
       <AuthProvider>
         <CartProvider>
           <React.Suspense fallback={<LoadingSpinner />}>
+            <ScrollToTop />
             {routes}
             <ToastContainer
               position="top-right"
@@ -119,7 +121,7 @@ const App = () => {
             />
             
             {/* Chatbot components */}
-            <ChatbotButton onClick={handleOpenChatbot} />
+            {!showChatbot && <ChatbotButton onClick={handleOpenChatbot} />}
             <ChatbotModal show={showChatbot} onHide={handleCloseChatbot} />
           </React.Suspense>
         </CartProvider>

@@ -10,7 +10,7 @@ const Categories = () => {
       image: '/images/categories/ao-polo.webp',
       description: 'Áo polo nam thanh lịch, đa dạng màu sắc',
       parentCategory: 3, // ID danh mục Áo nam
-      subcategory: 10    // ID danh mục Áo polo
+      subcategory: 9    // ID danh mục Áo polo
     },
     {
       id: 2,
@@ -18,7 +18,7 @@ const Categories = () => {
       image: '/images/categories/ao-thun.webp',
       description: 'Áo thun nam thoải mái, phong cách trẻ trung',
       parentCategory: 3, // ID danh mục Áo nam
-      subcategory: 9     // ID danh mục Áo thun
+      subcategory: 8     // ID danh mục Áo thun
     },
     {
       id: 3,
@@ -26,7 +26,7 @@ const Categories = () => {
       image: '/images/categories/quan-jeans.webp', 
       description: 'Quần jeans nam phong cách hiện đại',
       parentCategory: 2, // ID danh mục Quần nam
-      subcategory: 6     // ID danh mục Quần jeans
+      subcategory: 5     // ID danh mục Quần jeans
     },
     {
       id: 4,
@@ -34,7 +34,7 @@ const Categories = () => {
       image: '/images/categories/quan-au.webp',
       description: 'Quần âu nam lịch sự, phù hợp công sở',
       parentCategory: 2, // ID danh mục Quần nam
-      subcategory: 7     // ID danh mục Quần âu
+      subcategory: 6     // ID danh mục Quần âu
     }
   ];
 

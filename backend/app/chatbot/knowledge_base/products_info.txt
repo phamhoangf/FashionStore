@@ -1,9 +1,171 @@
 --- PRODUCT ---
-Thông tin sản phẩm ID: 19
-Tên sản phẩm: Áo Polo Can
-Mô tả: Không có mô tả
-Giá: 500000.0 VNĐ
-Giá khuyến mãi: 420000.0 VNĐ
-Danh mục: Áo polo
-Chất liệu: N/A
-Số lượng tồn kho: 15
+Thông tin sản phẩm ID: 19  
+Tên sản phẩm: Áo Polo Can  
+Mô tả: Không có mô tả  
+Giá: 500000.0 VNĐ  
+Giá khuyến mãi: 420000.0 VNĐ  
+Danh mục: Áo polo  
+Chất liệu: N/A  
+Số lượng tồn kho: 15  
+
+--- PRODUCT ---
+Tên sản phẩm: Quần short kaki nam  
+Mô tả: Quần short kaki nam chất liệu cao cấp, thoáng mát  
+Giá: 350000 VNĐ  
+Giá khuyến mãi: 299000 VNĐ  
+Danh mục: Quần short  
+Chất liệu: N/A  
+Số lượng tồn kho: 100  
+
+--- PRODUCT ---
+Tên sản phẩm: Quần short jeans nam  
+Mô tả: Quần short jeans nam form regular, màu xanh đậm  
+Giá: 380000 VNĐ  
+Giá khuyến mãi: 329000 VNĐ  
+Danh mục: Quần short  
+Chất liệu: N/A  
+Số lượng tồn kho: 80  
+
+--- PRODUCT ---
+Tên sản phẩm: Quần jeans nam slim fit  
+Mô tả: Quần jeans nam slim fit, co giãn thoải mái  
+Giá: 550000 VNĐ  
+Giá khuyến mãi: 499000 VNĐ  
+Danh mục: Quần jeans  
+Chất liệu: N/A  
+Số lượng tồn kho: 120  
+
+--- PRODUCT ---
+Tên sản phẩm: Quần jeans nam rách gối  
+Mô tả: Quần jeans nam rách gối, phong cách trẻ trung  
+Giá: 520000 VNĐ  
+Giá khuyến mãi: 459000 VNĐ  
+Danh mục: Quần jeans  
+Chất liệu: N/A  
+Số lượng tồn kho: 70  
+
+--- PRODUCT ---
+Tên sản phẩm: Quần âu nam công sở  
+Mô tả: Quần âu nam công sở, chất liệu cao cấp, form slim fit  
+Giá: 450000 VNĐ  
+Giá khuyến mãi: 399000 VNĐ  
+Danh mục: Quần âu  
+Chất liệu: N/A  
+Số lượng tồn kho: 150  
+
+--- PRODUCT ---
+Tên sản phẩm: Quần âu nam kẻ caro  
+Mô tả: Quần âu nam kẻ caro, thiết kế hiện đại  
+Giá: 480000 VNĐ  
+Giá khuyến mãi: 429000 VNĐ  
+Danh mục: Quần âu  
+Chất liệu: N/A  
+Số lượng tồn kho: 60  
+
+--- PRODUCT ---
+Tên sản phẩm: Quần kaki nam dài  
+Mô tả: Quần kaki nam dài, chất liệu mềm mại, thoáng khí  
+Giá: 420000 VNĐ  
+Giá khuyến mãi: 379000 VNĐ  
+Danh mục: Quần kaki  
+Chất liệu: N/A  
+Số lượng tồn kho: 100  
+
+--- PRODUCT ---
+Tên sản phẩm: Quần kaki nam ống đứng  
+Mô tả: Quần kaki nam ống đứng, phù hợp mọi dáng người  
+Giá: 400000 VNĐ  
+Giá khuyến mãi: 349000 VNĐ  
+Danh mục: Quần kaki  
+Chất liệu: N/A  
+Số lượng tồn kho: 85  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo thun nam cổ tròn  
+Mô tả: Áo thun nam cổ tròn basic, chất liệu cotton 100%  
+Giá: 250000 VNĐ  
+Giá khuyến mãi: 199000 VNĐ  
+Danh mục: Áo thun  
+Chất liệu: N/A  
+Số lượng tồn kho: 200  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo thun nam in họa tiết  
+Mô tả: Áo thun nam in họa tiết, phong cách trẻ trung  
+Giá: 280000 VNĐ  
+Giá khuyến mãi: 239000 VNĐ  
+Danh mục: Áo thun  
+Chất liệu: N/A  
+Số lượng tồn kho: 150  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo polo nam basic  
+Mô tả: Áo polo nam basic, chất liệu cotton cao cấp  
+Giá: 350000 VNĐ  
+Giá khuyến mãi: 299000 VNĐ  
+Danh mục: Áo polo  
+Chất liệu: N/A  
+Số lượng tồn kho: 180  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo polo nam kẻ sọc  
+Mô tả: Áo polo nam kẻ sọc, thiết kế thanh lịch  
+Giá: 380000 VNĐ  
+Giá khuyến mãi: 329000 VNĐ  
+Danh mục: Áo polo  
+Chất liệu: N/A  
+Số lượng tồn kho: 120  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo sơ mi nam dài tay  
+Mô tả: Áo sơ mi nam dài tay, chất liệu linen thoáng mát  
+Giá: 450000 VNĐ  
+Giá khuyến mãi: 399000 VNĐ  
+Danh mục: Áo sơ mi  
+Chất liệu: N/A  
+Số lượng tồn kho: 150  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo sơ mi nam ngắn tay  
+Mô tả: Áo sơ mi nam ngắn tay, họa tiết hoa văn  
+Giá: 420000 VNĐ  
+Giá khuyến mãi: 369000 VNĐ  
+Danh mục: Áo sơ mi  
+Chất liệu: N/A  
+Số lượng tồn kho: 100  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo khoác dù nam  
+Mô tả: Áo khoác dù nam chống nước, có mũ  
+Giá: 650000 VNĐ  
+Giá khuyến mãi: 599000 VNĐ  
+Danh mục: Áo khoác  
+Chất liệu: N/A  
+Số lượng tồn kho: 80  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo khoác jean nam  
+Mô tả: Áo khoác jean nam form rộng, màu xanh nhạt  
+Giá: 580000 VNĐ  
+Giá khuyến mãi: 499000 VNĐ  
+Danh mục: Áo khoác  
+Chất liệu: N/A  
+Số lượng tồn kho: 70  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo len nam cổ tròn  
+Mô tả: Áo len nam cổ tròn, chất liệu len mềm mại, ấm áp  
+Giá: 450000 VNĐ  
+Giá khuyến mãi: 399000 VNĐ  
+Danh mục: Áo len  
+Chất liệu: N/A  
+Số lượng tồn kho: 120  
+
+--- PRODUCT ---
+Tên sản phẩm: Áo len nam cardigan  
+Mô tả: Áo len nam cardigan, thiết kế hiện đại, trẻ trung  
+Giá: 520000 VNĐ  
+Giá khuyến mãi: 459000 VNĐ  
+Danh mục: Áo len  
+Chất liệu: N/A  
+Số lượng tồn kho: 90  

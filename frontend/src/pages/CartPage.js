@@ -61,12 +61,8 @@ const CartPage = () => {
         localStorage.setItem('selectedCartItems', JSON.stringify(selectedItems));
         console.log('Selected items saved to localStorage:', selectedItems);
         
-        // Để đảm bảo dữ liệu được ghi vào localStorage trước khi chuyển trang
-        setTimeout(() => {
-          // Sử dụng window.location.href để tải lại hoàn toàn trang
-          window.location.href = '/checkout';
-          console.log('Redirecting to checkout page...');
-        }, 100);
+        // Sử dụng navigate trực tiếp thay vì window.location.href
+        navigate('/checkout');
       } catch (error) {
         console.error('Error during checkout process:', error);
         alert('Có lỗi xảy ra khi chuyển hướng đến trang thanh toán. Vui lòng thử lại.');

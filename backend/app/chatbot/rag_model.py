@@ -7,6 +7,7 @@ import traceback
 from typing import List, Dict, Any, Optional
 import numpy as np
 from pathlib import Path
+from collections import deque
 
 # Langchain imports
 from google import genai
@@ -29,6 +30,7 @@ CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 TOP_K_RESULTS = 5  # Increased to get more context
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") 
+MAX_HISTORY_LENGTH = 10  # Maximum number of messages to keep in conversation history
 
 class RAGChatbot:
     """RAG-based Chatbot class for customer support"""
@@ -45,6 +47,9 @@ class RAGChatbot:
             
             # Create directories if they don't exist
             os.makedirs(KNOWLEDGE_BASE_DIR, exist_ok=True)
+            
+            # Initialize conversation history as a deque with max length
+            self.conversation_history = deque(maxlen=MAX_HISTORY_LENGTH)
             
             # Initialize embeddings
             logger.info(f"Loading embeddings model: {EMBEDDINGS_MODEL}")
@@ -76,7 +81,7 @@ class RAGChatbot:
             
             # Define the prompt template for customer support
             self.prompt_template = PromptTemplate(
-                input_variables=["question", "context"],
+                input_variables=["question", "context", "history"],
                 template="""
                 Bạn là trợ lý ảo của một cửa hàng thời trang nam. Nhiệm vụ của bạn là trả lời các câu hỏi của khách hàng 
                 một cách chính xác, lịch sự và hữu ích.
@@ -85,7 +90,10 @@ class RAGChatbot:
                 1. QUẦN NAM: gồm quần short, quần jeans, quần âu, quần kaki
                 2. ÁO NAM: gồm áo thun, áo polo, áo sơ mi, áo khoác, áo len
                 
-                Dựa trên các thông tin từ cửa hàng được cung cấp bên dưới, hãy trả lời câu hỏi của khách hàng.
+                Dưới đây là lịch sử cuộc trò chuyện với khách hàng:
+                {history}
+                
+                Dựa trên các thông tin từ cửa hàng được cung cấp bên dưới và lịch sử trò chuyện, hãy trả lời câu hỏi của khách hàng.
                 Nếu bạn không tìm thấy câu trả lời trong thông tin được cung cấp, hãy nói rằng bạn không có thông tin về vấn đề đó 
                 và đề nghị khách hàng liên hệ trực tiếp với bộ phận chăm sóc khách hàng.
                 
@@ -202,15 +210,17 @@ class RAGChatbot:
             
             # Extract and combine relevant contexts
             contexts = [doc.page_content for doc in docs]
-            sources = [doc.metadata.get("source", "Unknown") for doc in docs]
+            # sources = [doc.metadata.get("source", "Unknown") for doc in docs]
             context_text = "\n\n".join(contexts)
             
             logger.debug(f"Context for question: {context_text[:500]}...")
             
-            # Format the prompt with the question and context
+            # Format the prompt with the question, context, and conversation history
+            history_text = "\n".join(self.conversation_history)
             prompt_text = self.prompt_template.format(
                 question=question,
-                context=context_text
+                context=context_text,
+                history=history_text
             )
 
             # Use gemini from google
@@ -218,12 +228,12 @@ class RAGChatbot:
             model_name = "gemini-2.0-flash"
             answer = client.models.generate_content(contents=prompt_text, model=model_name).text
             
+            # Update conversation history
+            self.conversation_history.append(f"Khách hàng: {question}")
+            self.conversation_history.append(f"Trợ lý: {answer}")
+            
             logger.info(f"Generated answer: {answer[:100]}...")
             
-            # return {
-            #     "answer": answer,
-            #     "sources": sources
-            # }
             return {"answer": answer}
         except Exception as e:
             logger.error(f"Error getting answer: {e}")

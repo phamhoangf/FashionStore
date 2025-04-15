@@ -3,11 +3,16 @@ import logging
 import traceback
 import time
 from ..chatbot.rag_model import get_chatbot_instance
+import uuid
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Dictionary to store session-specific chatbot instances
+# This allows each user to have their own conversation history
+session_chatbots = {}
 
 chatbot_blueprint = Blueprint('chatbot', __name__)
 
@@ -29,6 +34,14 @@ def ask_question():
         question = data['question']
         logger.info(f"Processing question: {question}")
         
+        # Get session ID, create one if not provided
+        session_id = data.get('session_id', None)
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            logger.info(f"Created new session ID: {session_id}")
+        else:
+            logger.info(f"Using existing session ID: {session_id}")
+        
         # Check if question is empty
         if not question or not question.strip():
             logger.warning("Empty question received")
@@ -36,9 +49,17 @@ def ask_question():
         
         # Try to get answer from chatbot
         try:
-            # Get the chatbot instance and ask the question
-            chatbot = get_chatbot_instance()
+            # Get or create session-specific chatbot instance
+            if session_id not in session_chatbots:
+                logger.info(f"Creating new chatbot instance for session {session_id}")
+                session_chatbots[session_id] = get_chatbot_instance()
+            
+            # Get answer from the session's chatbot
+            chatbot = session_chatbots[session_id]
             result = chatbot.get_answer(question)
+            
+            # Include session_id in the response
+            result['session_id'] = session_id
             
             # Log the processing time
             elapsed_time = time.time() - start_time
@@ -56,7 +77,8 @@ def ask_question():
                 logger.info(f"Using fallback answer for question: {question}")
                 return jsonify({
                     "answer": fallback_answer,
-                    "sources": ["fallback_responses"]
+                    "sources": ["fallback_responses"],
+                    "session_id": session_id
                 })
             
             # If no fallback, return error
@@ -68,7 +90,8 @@ def ask_question():
         return jsonify({
             "answer": "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau.",
             "sources": [],
-            "error": str(e)
+            "error": str(e),
+            "session_id": data.get('session_id', str(uuid.uuid4()))
         }), 500
 
 @chatbot_blueprint.route('/rebuild-index', methods=['POST'])
@@ -80,6 +103,10 @@ def rebuild_index():
         # Get the chatbot instance with rebuild_index=True
         start_time = time.time()
         chatbot = get_chatbot_instance(rebuild_index=True)
+        
+        # Clear all session chatbots to force reload with new index
+        global session_chatbots
+        session_chatbots = {}
         
         # Log the rebuild time
         elapsed_time = time.time() - start_time
@@ -114,6 +141,30 @@ def health_check():
             "error": str(e)
         }), 500
 
+@chatbot_blueprint.route('/clear-session', methods=['POST'])
+def clear_session():
+    """API endpoint to clear a specific chatbot session history"""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id')
+        
+        if not session_id:
+            return jsonify({"error": "Missing session_id parameter"}), 400
+        
+        if session_id in session_chatbots:
+            # Remove the session chatbot instance
+            del session_chatbots[session_id]
+            logger.info(f"Cleared session {session_id}")
+            return jsonify({"message": f"Session {session_id} cleared successfully"})
+        else:
+            logger.info(f"Session {session_id} not found")
+            return jsonify({"message": f"Session {session_id} not found"}), 404
+            
+    except Exception as e:
+        logger.error(f"Error clearing session: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
 def get_fallback_answer(question):
     """Provide fallback answers for common questions when the chatbot fails"""
     question_lower = question.lower()
@@ -126,13 +177,11 @@ def get_fallback_answer(question):
         
         "chính sách đổi trả": "Cửa hàng chúng tôi chấp nhận đổi trả trong vòng 30 ngày kể từ ngày mua hàng, với điều kiện sản phẩm còn nguyên tem nhãn, chưa qua sử dụng và có hóa đơn mua hàng. Đối với sản phẩm giảm giá, thời gian đổi trả là 14 ngày.",
         
+        "thời gian giao hàng": "Thời gian giao hàng thông thường là 2-3 ngày làm việc đối với các thành phố lớn và 3-5 ngày làm việc đối với các tỉnh thành khác. Đối với khu vực miền núi và hải đảo, thời gian giao hàng có thể kéo dài từ 5-7 ngày làm việc.",
+        
         "tài khoản": "Để tạo tài khoản mới, bạn chỉ cần nhấp vào biểu tượng người dùng ở góc phải trên cùng của trang web, sau đó chọn 'Đăng ký'. Điền thông tin cá nhân của bạn như tên, email và mật khẩu, sau đó nhấp vào nút 'Đăng ký'.",
         
         "phương thức thanh toán": "Chúng tôi chấp nhận nhiều phương thức thanh toán khác nhau bao gồm: thẻ tín dụng/ghi nợ (Visa, MasterCard, JCB), ví điện tử (Momo, VNPay, ZaloPay), chuyển khoản ngân hàng và thanh toán khi nhận hàng (COD).",
-        
-        "size": "Để chọn size quần áo phù hợp, bạn có thể tham khảo bảng size chi tiết trong mục mô tả sản phẩm. Nếu bạn không chắc chắn về size của mình, hãy đo các số đo cơ thể và so sánh với bảng size của chúng tôi.",
-        
-        "thời gian giao hàng": "Thời gian giao hàng thông thường là 2-3 ngày làm việc đối với các thành phố lớn và 3-5 ngày làm việc đối với các tỉnh thành khác. Đối với khu vực miền núi và hải đảo, thời gian giao hàng có thể kéo dài từ 5-7 ngày làm việc.",
         
         "liên hệ": "Bạn có thể liên hệ với bộ phận chăm sóc khách hàng của chúng tôi thông qua các kênh sau: Hotline: 1900-1234 (8h-22h hàng ngày), Email: support@example.com, Live chat trên website, hoặc qua trang Fanpage Facebook chính thức của chúng tôi.",
         
@@ -151,4 +200,4 @@ def get_fallback_answer(question):
             return "Xin chào! Tôi là trợ lý ảo của cửa hàng. Tôi có thể giúp bạn trả lời các câu hỏi về sản phẩm, đơn hàng, vận chuyển và các chính sách của cửa hàng."
     
     # No match found
-    return None 
+    return None

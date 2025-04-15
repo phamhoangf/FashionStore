@@ -403,7 +403,7 @@ def get_dashboard_stats():
                 'error': 'Không có quyền admin',
                 'message': 'Admin privileges required'
             }), 403
-        
+            
         current_app.logger.info(f"User {user_id} ({user.email}) is admin, proceeding with dashboard data")
         
         # Tổng số sản phẩm
@@ -461,9 +461,20 @@ def get_dashboard_stats():
             recent_orders_data = []
             for order in recent_orders:
                 try:
+                    # Get customer information from User model
+                    customer = User.query.get(order.user_id)
+                    customer_name = ''
+                    customer_phone = ''
+                    
+                    if customer:
+                        customer_name = customer.name
+                        customer_phone = customer.phone
+                    
                     order_dict = {
                         'id': order.id,
                         'user_id': order.user_id,
+                        'customer_name': customer_name,
+                        'customer_phone': customer_phone,
                         'status': order.status,
                         'total_amount': order.total_amount,
                         'created_at': order.created_at.isoformat() if order.created_at else None

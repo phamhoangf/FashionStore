@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Modal, Button, Form, Spinner } from 'react-bootstrap';
-import { FaRobot, FaPaperPlane } from 'react-icons/fa';
+import { FaRobot, FaPaperPlane, FaTrash } from 'react-icons/fa';
 import './ChatbotModal.css';
 import axios from 'axios';
 
@@ -20,6 +20,7 @@ const ChatbotModal = ({ show, onHide }) => {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
   const [chatSessionId, setChatSessionId] = useState('');
+  const [backendSessionId, setBackendSessionId] = useState('');
 
   // Hàm trả về tin nhắn chào mừng mặc định
   function getDefaultWelcomeMessage() {
@@ -53,6 +54,12 @@ const ChatbotModal = ({ show, onHide }) => {
           ...msg,
           timestamp: new Date(msg.timestamp)
         })));
+        
+        // Lấy backend session ID từ localStorage nếu có
+        const savedBackendSessionId = localStorage.getItem(`${chatId}_backend_session`);
+        if (savedBackendSessionId) {
+          setBackendSessionId(savedBackendSessionId);
+        }
       } catch (e) {
         console.error('Error parsing saved messages:', e);
         setMessages(getDefaultWelcomeMessage());
@@ -71,14 +78,33 @@ const ChatbotModal = ({ show, onHide }) => {
   useEffect(() => {
     if (messages.length > 0 && chatSessionId) {
       localStorage.setItem(chatSessionId, JSON.stringify(messages));
+      
+      // Lưu backend session ID nếu có
+      if (backendSessionId) {
+        localStorage.setItem(`${chatSessionId}_backend_session`, backendSessionId);
+      }
     }
-  }, [messages, chatSessionId]);
+  }, [messages, chatSessionId, backendSessionId]);
 
   // Lắng nghe sự kiện đăng xuất để reset chat
   useEffect(() => {
-    const resetChatOnLogout = () => {
+    const resetChatOnLogout = async () => {
       console.log('Resetting chatbot messages due to logout');
+      
+      // Clear backend session if exists
+      if (backendSessionId) {
+        try {
+          await axios.post(`${API_URL}/chatbot/clear-session`, {
+            session_id: backendSessionId
+          });
+          console.log(`Cleared backend session on logout: ${backendSessionId}`);
+        } catch (err) {
+          console.error('Error clearing backend session on logout:', err);
+        }
+      }
+      
       setMessages(getDefaultWelcomeMessage());
+      setBackendSessionId(''); // Reset backend session ID
       
       // Xóa tất cả các phiên chat trong localStorage
       // Nhưng giữ lại sessionId
@@ -90,9 +116,23 @@ const ChatbotModal = ({ show, onHide }) => {
     };
 
     // Sự kiện khi đăng nhập thành công
-    const resetChatOnLogin = () => {
+    const resetChatOnLogin = async () => {
       console.log('Resetting chatbot messages due to login');
+      
+      // Clear backend session if exists
+      if (backendSessionId) {
+        try {
+          await axios.post(`${API_URL}/chatbot/clear-session`, {
+            session_id: backendSessionId
+          });
+          console.log(`Cleared backend session on login: ${backendSessionId}`);
+        } catch (err) {
+          console.error('Error clearing backend session on login:', err);
+        }
+      }
+      
       setMessages(getDefaultWelcomeMessage());
+      setBackendSessionId(''); // Reset backend session ID
       
       // Cập nhật chatSessionId dựa trên token mới
       const token = localStorage.getItem('token');
@@ -109,10 +149,25 @@ const ChatbotModal = ({ show, onHide }) => {
       window.removeEventListener('user-logout', resetChatOnLogout);
       window.removeEventListener('user-login', resetChatOnLogin);
     };
-  }, []);
+  }, [backendSessionId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Hàm xử lý ngắt dòng trong tin nhắn
+  const formatMessageText = (text) => {
+    // Chia văn bản thành các phần dựa trên dấu xuống dòng (newline)
+    const paragraphs = text.split('\n');
+    
+    // Trả về mảng các phần tử JSX, mỗi phần tử là một đoạn văn
+    // với React.Fragment để tránh thêm thẻ div thừa
+    return paragraphs.map((paragraph, index) => (
+      <React.Fragment key={index}>
+        {paragraph}
+        {index < paragraphs.length - 1 && <br />}
+      </React.Fragment>
+    ));
   };
 
   const handleSendMessage = async (e) => {
@@ -132,19 +187,26 @@ const ChatbotModal = ({ show, onHide }) => {
     setError(null);
 
     try {
-      // Send request to backend
-      console.log(`Sending question to ${API_URL}/chatbot/ask`);
+      // Send request to backend with session ID if available
+      console.log(`Sending question to ${API_URL}/chatbot/ask with session ID: ${backendSessionId}`);
       const response = await axios.post(`${API_URL}/chatbot/ask`, {
-        question: userMessage.text
+        question: userMessage.text,
+        session_id: backendSessionId || undefined
       });
 
       console.log('Chatbot response:', response.data);
+      
+      // Save or update backend session ID if provided in response
+      if (response.data.session_id) {
+        setBackendSessionId(response.data.session_id);
+      }
 
       // Add bot response to chat
       setMessages(prev => [...prev, {
         text: response.data.answer,
         sender: 'bot',
         timestamp: new Date(),
+        sources: response.data.sources || []
       }]);
     } catch (err) {
       console.error('Error getting chatbot response:', err);
@@ -180,99 +242,151 @@ const ChatbotModal = ({ show, onHide }) => {
   const handleSuggestedQuestion = (question) => {
     setInput(question);
   };
+  
+  // Xử lý reset cuộc trò chuyện
+  const handleResetChat = async () => {
+    // Nếu có backend session ID, gửi yêu cầu xóa session
+    if (backendSessionId) {
+      try {
+        await axios.post(`${API_URL}/chatbot/clear-session`, {
+          session_id: backendSessionId
+        });
+        console.log(`Cleared backend session: ${backendSessionId}`);
+      } catch (err) {
+        console.error('Error clearing backend session:', err);
+      }
+    }
+    
+    // Reset chat UI
+    setMessages(getDefaultWelcomeMessage());
+    setBackendSessionId('');
+    
+    // Xóa dữ liệu chat từ localStorage
+    if (chatSessionId) {
+      localStorage.removeItem(chatSessionId);
+      localStorage.removeItem(`${chatSessionId}_backend_session`);
+    }
+  };
+
+  // Ngăn ngừng sự kiện lan truyền khi click vào modal
+  const handleModalClick = (e) => {
+    e.stopPropagation();
+  };
+
+  if (!show) {
+    return null;
+  }
 
   return (
-    <Modal 
-      show={show} 
-      onHide={onHide} 
-      centered
-      className="chatbot-modal"
-    >
-      <Modal.Header closeButton>
-        <Modal.Title>
-          <FaRobot className="me-2" />
-          Trợ lý ảo
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body className="chatbot-body">
-        <div className="messages-container">
-          {messages.map((msg, index) => (
-            <div 
-              key={index} 
-              className={`message ${msg.sender} ${msg.isError ? 'error' : ''}`}
+    <div className="chatbot-modal" onClick={handleModalClick}>
+      <Modal.Dialog>
+        <Modal.Header>
+          <Modal.Title>
+            <FaRobot className="me-2" />
+            Trợ lý ảo
+          </Modal.Title>
+          
+          <div className="d-flex align-items-center">
+            <Button 
+              variant="link"
+              size="sm"
+              onClick={handleResetChat}
+              title="Làm mới cuộc trò chuyện"
+              className="p-1 text-white"
             >
-              <div className="message-content">
-                <div className="message-text">{msg.text}</div>
-                {msg.sources && msg.sources.length > 0 && (
-                  <div className="message-sources">
-                    <small>
-                      Nguồn: {msg.sources.join(', ')}
-                    </small>
+              <FaTrash />
+            </Button>
+            <button 
+              type="button" 
+              className="btn-close btn-close-white" 
+              onClick={onHide} 
+              aria-label="Close"
+            ></button>
+          </div>
+        </Modal.Header>
+
+        <Modal.Body className="chatbot-body">
+          <div className="messages-container">
+            {messages.map((msg, index) => (
+              <div 
+                key={index} 
+                className={`message ${msg.sender} ${msg.isError ? 'error' : ''}`}
+              >
+                <div className="message-content">
+                  <div className="message-text">
+                    {formatMessageText(msg.text)}
                   </div>
-                )}
-                <div className="message-time">
-                  <small>{formatTime(msg.timestamp)}</small>
+                  {msg.sources && msg.sources.length > 0 && (
+                    <div className="message-sources">
+                      <small>
+                        Nguồn: {msg.sources.join(', ')}
+                      </small>
+                    </div>
+                  )}
+                  <div className="message-time">
+                    <small>{formatTime(msg.timestamp)}</small>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="message bot">
-              <div className="message-content">
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+            ))}
+            {isLoading && (
+              <div className="message bot">
+                <div className="message-content">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
                 </div>
               </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+          
+          {messages.length === 1 && (
+            <div className="suggested-questions">
+              <div className="suggested-title">Câu hỏi phổ biến:</div>
+              {suggestedQuestions.map((question, index) => (
+                <Button
+                  key={index}
+                  variant="outline-primary"
+                  size="sm"
+                  className="suggested-question"
+                  onClick={() => handleSuggestedQuestion(question)}
+                >
+                  {question}
+                </Button>
+              ))}
             </div>
           )}
-          <div ref={messagesEndRef} />
-        </div>
-        
-        {messages.length === 1 && (
-          <div className="suggested-questions">
-            <div className="suggested-title">Câu hỏi phổ biến:</div>
-            {suggestedQuestions.map((question, index) => (
-              <Button
-                key={index}
-                variant="outline-primary"
-                size="sm"
-                className="suggested-question"
-                onClick={() => handleSuggestedQuestion(question)}
+        </Modal.Body>
+        <Modal.Footer className="p-2">
+          <Form className="chatbot-input-form" onSubmit={handleSendMessage}>
+            <Form.Group className="d-flex w-100">
+              <Form.Control
+                type="text"
+                placeholder="Nhập câu hỏi của bạn..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                disabled={isLoading}
+              />
+              <Button 
+                variant="primary" 
+                type="submit" 
+                className="ms-2 send-button" 
+                disabled={isLoading || !input.trim()}
               >
-                {question}
+                {isLoading ? (
+                  <Spinner animation="border" size="sm" />
+                ) : (
+                  <FaPaperPlane />
+                )}
               </Button>
-            ))}
-          </div>
-        )}
-      </Modal.Body>
-      <Modal.Footer className="p-2">
-        <Form className="chatbot-input-form" onSubmit={handleSendMessage}>
-          <Form.Group className="d-flex w-100">
-            <Form.Control
-              type="text"
-              placeholder="Nhập câu hỏi của bạn..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={isLoading}
-            />
-            <Button 
-              variant="primary" 
-              type="submit" 
-              className="ms-2 send-button" 
-              disabled={isLoading || !input.trim()}
-            >
-              {isLoading ? (
-                <Spinner animation="border" size="sm" />
-              ) : (
-                <FaPaperPlane />
-              )}
-            </Button>
-          </Form.Group>
-        </Form>
-      </Modal.Footer>
-    </Modal>
+            </Form.Group>
+          </Form>
+        </Modal.Footer>
+      </Modal.Dialog>
+    </div>
   );
 };
 
